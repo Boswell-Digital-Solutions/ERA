@@ -21,6 +21,15 @@ Write evidence only inside ERA/artifacts/.
 Report failures as evidence.
 ```
 
+Allowed evaluation behavior in ERA-01B:
+
+```text
+Run configured redundancy commands.
+Record missing redundancy tools as blocked gates.
+Honor operator-approved intentional redundancy exceptions.
+Keep redundancy findings as review candidates, not defects.
+```
+
 Operator notes:
 
 ```text

@@ -17,7 +17,7 @@ def _write_bytes(path: Path, payload: bytes) -> str:
 
 def run_planned_commands(
     planned_commands: list[PlannedCommand],
-    commands_dir: Path,
+    commands_dirs: dict[str, Path],
     tool_versions: dict[str, str],
     timeout_seconds: int = 1800,
 ) -> list[CommandResult]:
@@ -27,6 +27,7 @@ def run_planned_commands(
         if not planned.execute:
             results.append(
                 CommandResult(
+                    lane=planned.lane,
                     command_id=planned.command_id,
                     label=planned.label,
                     command=planned.command,
@@ -47,6 +48,7 @@ def run_planned_commands(
             )
             continue
 
+        commands_dir = commands_dirs[planned.lane]
         stdout_path = commands_dir / f"{planned.command_id}.stdout.txt"
         stderr_path = commands_dir / f"{planned.command_id}.stderr.txt"
         timer_started = time.monotonic()
@@ -66,7 +68,7 @@ def run_planned_commands(
             stdout_payload = completed.stdout
             stderr_payload = completed.stderr
             exit_code = completed.returncode
-            status = "passed" if completed.returncode == 0 else "failed"
+            status = "passed" if completed.returncode in planned.success_exit_codes else "failed"
         except subprocess.TimeoutExpired as exc:
             stdout_payload = exc.stdout or b""
             stderr_payload = exc.stderr or b""
@@ -91,6 +93,7 @@ def run_planned_commands(
 
         results.append(
             CommandResult(
+                lane=planned.lane,
                 command_id=planned.command_id,
                 label=planned.label,
                 command=planned.command,

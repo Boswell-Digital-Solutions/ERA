@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass
 
 @dataclass
 class PlannedCommand:
+    lane: str
     command_id: str
     label: str
     command: list[str]
@@ -13,10 +14,12 @@ class PlannedCommand:
     execute: bool = True
     planned_status: str = "planned"
     reason: str | None = None
+    success_exit_codes: tuple[int, ...] = (0,)
 
 
 @dataclass
 class CommandResult:
+    lane: str
     command_id: str
     label: str
     command: list[str]

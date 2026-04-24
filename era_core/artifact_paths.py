@@ -32,7 +32,9 @@ class RunPaths:
     root: Path
     evidence_dir: Path
     accuracy_dir: Path
-    commands_dir: Path
+    redundancy_dir: Path
+    accuracy_commands_dir: Path
+    redundancy_commands_dir: Path
     run_json: Path
     target_manifest: Path
     tool_availability: Path
@@ -41,6 +43,7 @@ class RunPaths:
     hashes: Path
     findings: Path
     test_evidence_bundle: Path
+    redundancy_evidence_bundle: Path
     centipede_bundle: Path
 
 
@@ -48,12 +51,16 @@ def build_run_paths(run_id: str, artifacts_root: Path | None = None) -> RunPaths
     root = (artifacts_root or default_artifacts_root()).resolve() / run_id
     evidence_dir = root / "evidence"
     accuracy_dir = evidence_dir / "accuracy"
-    commands_dir = accuracy_dir / "commands"
+    redundancy_dir = evidence_dir / "redundancy"
+    accuracy_commands_dir = accuracy_dir / "commands"
+    redundancy_commands_dir = redundancy_dir / "commands"
     return RunPaths(
         root=root,
         evidence_dir=evidence_dir,
         accuracy_dir=accuracy_dir,
-        commands_dir=commands_dir,
+        redundancy_dir=redundancy_dir,
+        accuracy_commands_dir=accuracy_commands_dir,
+        redundancy_commands_dir=redundancy_commands_dir,
         run_json=root / "run.json",
         target_manifest=root / "target_manifest.json",
         tool_availability=root / "tool_availability.json",
@@ -62,12 +69,20 @@ def build_run_paths(run_id: str, artifacts_root: Path | None = None) -> RunPaths
         hashes=root / "hashes.json",
         findings=root / "findings.json",
         test_evidence_bundle=accuracy_dir / "test_evidence_bundle.json",
+        redundancy_evidence_bundle=redundancy_dir / "redundancy_evidence_bundle.json",
         centipede_bundle=root / "centipede_bundle.json",
     )
 
 
 def ensure_run_dirs(paths: RunPaths) -> None:
-    for directory in (paths.root, paths.evidence_dir, paths.accuracy_dir, paths.commands_dir):
+    for directory in (
+        paths.root,
+        paths.evidence_dir,
+        paths.accuracy_dir,
+        paths.redundancy_dir,
+        paths.accuracy_commands_dir,
+        paths.redundancy_commands_dir,
+    ):
         directory.mkdir(parents=True, exist_ok=True)
 
 

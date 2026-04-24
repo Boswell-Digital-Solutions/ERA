@@ -14,7 +14,7 @@ def _probe_tool(tool: str, version_command: list[str], applicable: bool) -> dict
             "tool": tool,
             "status": "not_applicable",
             "version": None,
-            "note": "Target manifests do not require this tool for ERA-01A.",
+            "note": "Target manifests do not require this tool for the requested ERA lanes.",
         }
 
     executable = sys.executable if tool == "python" else shutil.which(tool)
@@ -73,6 +73,8 @@ def build_tool_availability_report(repo_path: Path, repo_id: str) -> dict[str, o
         _probe_tool("python", [sys.executable, "--version"], applicable=True),
         _probe_tool("cargo", ["cargo", "--version"], applicable=has_cargo_manifest),
         _probe_tool("bun", ["bun", "--version"], applicable=has_package_json),
+        _probe_tool("jscpd", ["jscpd", "--version"], applicable=has_package_json),
+        _probe_tool("knip", ["knip", "--version"], applicable=has_package_json),
     ]
     return {
         "schema_version": "ERAToolAvailabilityReport.v1",

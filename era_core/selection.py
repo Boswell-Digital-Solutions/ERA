@@ -23,6 +23,7 @@ def detect_accuracy_commands(repo_path: Path) -> list[PlannedCommand]:
     cargo_reason = None if cargo_manifest.exists() else "src-tauri/Cargo.toml not found."
     commands.append(
         PlannedCommand(
+            lane="accuracy",
             command_id="cargo_check",
             label="cargo check",
             command=["cargo", "check", "--manifest-path", "src-tauri/Cargo.toml"],
@@ -35,6 +36,7 @@ def detect_accuracy_commands(repo_path: Path) -> list[PlannedCommand]:
     )
     commands.append(
         PlannedCommand(
+            lane="accuracy",
             command_id="cargo_test",
             label="cargo test",
             command=["cargo", "test", "--manifest-path", "src-tauri/Cargo.toml"],
@@ -65,6 +67,7 @@ def detect_accuracy_commands(repo_path: Path) -> list[PlannedCommand]:
 
     commands.append(
         PlannedCommand(
+            lane="accuracy",
             command_id="bun_test",
             label="bun test",
             command=["bun", "test"],
@@ -77,6 +80,7 @@ def detect_accuracy_commands(repo_path: Path) -> list[PlannedCommand]:
     )
     commands.append(
         PlannedCommand(
+            lane="accuracy",
             command_id="bun_build",
             label="bun run build",
             command=["bun", "run", "build"],
@@ -269,6 +273,7 @@ def apply_selection_and_tooling(
         if hold_execution:
             planned.append(
                 PlannedCommand(
+                    lane=command.lane,
                     command_id=command.command_id,
                     label=command.label,
                     command=command.command,
@@ -277,6 +282,7 @@ def apply_selection_and_tooling(
                     execute=False,
                     planned_status="skipped",
                     reason=str(selection_artifact["fallback_reason"]),
+                    success_exit_codes=command.success_exit_codes,
                 )
             )
             continue
@@ -285,6 +291,7 @@ def apply_selection_and_tooling(
             status = "blocked_by_missing_tool" if tool["status"] == "missing" else "skipped"
             planned.append(
                 PlannedCommand(
+                    lane=command.lane,
                     command_id=command.command_id,
                     label=command.label,
                     command=command.command,
@@ -293,6 +300,7 @@ def apply_selection_and_tooling(
                     execute=False,
                     planned_status=status,
                     reason=f"{command.tool_name} status is {tool['status']}.",
+                    success_exit_codes=command.success_exit_codes,
                 )
             )
             continue

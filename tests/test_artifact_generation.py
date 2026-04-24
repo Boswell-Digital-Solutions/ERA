@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-import re
-import shutil
 import subprocess
 import tempfile
 import unittest
@@ -62,6 +59,7 @@ class ArtifactGenerationTests(unittest.TestCase):
 
     def test_command_result_serialization(self) -> None:
         result = CommandResult(
+            lane="accuracy",
             command_id="python_echo",
             label="python echo",
             command=["python", "-c", "print('ok')"],
@@ -96,7 +94,8 @@ class ArtifactGenerationTests(unittest.TestCase):
                 artifacts_root=era_root / "artifacts" / "era-runs",
             )
             review = (run_dir / "review.md").read_text(encoding="utf-8")
-            self.assertIn("# ERA Accuracy Review", review)
+            self.assertIn("# ERA Review", review)
+            self.assertIn("## Accuracy Lane", review)
 
 
 if __name__ == "__main__":

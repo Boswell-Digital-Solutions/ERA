@@ -1,0 +1,222 @@
+{
+  "decision_traces": [
+    {
+      "decision_key": "era_self_healing_proof_gate",
+      "decision_stage": "era_accuracy_gate",
+      "disposition": "failed",
+      "evidence_payload_json": "{\"command_id\": \"era_self_healing_proof_gate\", \"exit_code\": 1, \"label\": \"ERA self-healing proof gate (synthetic fixture)\", \"status\": \"failed\", \"stderr_sha256\": \"1111111111111111111111111111111111111111111111111111111111111111\", \"stdout_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\"}",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "producer_id": "era-cli",
+      "producer_version": "fixture",
+      "rationale": "ERA self-healing proof gate (synthetic fixture) recorded status failed.",
+      "repository_id": "forge_command",
+      "revision_anchor": "0000000000000000000000000000000000000000",
+      "run_id": "era-sh-chain-proof-fixture",
+      "trace_id": "era-trace:era-sh-chain-proof-fixture:era_self_healing_proof_gate"
+    },
+    {
+      "decision_key": "target_repo_status",
+      "decision_stage": "era_read_only_invariant",
+      "disposition": "passed",
+      "evidence_payload_json": "{\"post_run_git_status_short\": \"\", \"post_run_head\": \"0000000000000000000000000000000000000000\", \"pre_run_git_status_short\": \"\", \"pre_run_head\": \"0000000000000000000000000000000000000000\", \"read_only_invariant_status\": \"clean_verified\"}",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "producer_id": "era-cli",
+      "producer_version": "fixture",
+      "rationale": "Synthetic fixture: ERA did not touch any repository.",
+      "repository_id": "forge_command",
+      "revision_anchor": "0000000000000000000000000000000000000000",
+      "run_id": "era-sh-chain-proof-fixture",
+      "trace_id": "era-trace:era-sh-chain-proof-fixture:read_only_invariant"
+    }
+  ],
+  "evidence_bundles": [
+    {
+      "affected_scope": [
+        {
+          "target_key": "era_self_healing_proof_gate",
+          "target_type": "command"
+        }
+      ],
+      "confidence_posture": "high",
+      "contradiction_bundles": [],
+      "detector_config_hash": null,
+      "detector_id": "era.accuracy",
+      "detector_version": "fixture",
+      "downstream_consumer_hints": [
+        "operator_review"
+      ],
+      "evidence_bundle_id": "era-evidence:era-sh-chain-proof-fixture:finding:era_self_healing_proof_gate:1",
+      "evidence_payloads": [
+        {
+          "authority_posture": "derived",
+          "payload_id": "era_self_healing_proof_gate:stdout",
+          "payload_kind": "stdout",
+          "payload_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "source_ref": "commands/accuracy/era_self_healing_proof_gate.stdout.txt"
+        },
+        {
+          "authority_posture": "derived",
+          "payload_id": "era_self_healing_proof_gate:stderr",
+          "payload_kind": "stderr",
+          "payload_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "source_ref": "commands/accuracy/era_self_healing_proof_gate.stderr.txt"
+        }
+      ],
+      "execution_environment": "{\"platform\": \"synthetic-fixture\", \"python_version\": \"synthetic-fixture\"}",
+      "finding_id": "finding:era_self_healing_proof_gate:1",
+      "non_affected_scope": [],
+      "observed_artifact_set": [
+        "era_self_healing_proof_gate"
+      ],
+      "produced_at": "2026-01-01T00:00:00Z",
+      "producer_id": "era-cli",
+      "producer_version": "fixture",
+      "record_type": "centipede.evidence_bundle",
+      "repo_shape": null,
+      "repository_id": "forge_command",
+      "reproduction_contract": {
+        "command": [
+          "era",
+          "self-healing-proof",
+          "--synthetic-fixture"
+        ],
+        "command_id": "era_self_healing_proof_gate",
+        "cwd": "/synthetic/forge_command",
+        "era_run_id": "era-sh-chain-proof-fixture",
+        "exit_code": 1,
+        "finding_type": "accuracy_gate_failed",
+        "lane": "accuracy",
+        "mode": "full",
+        "repo_path": "/synthetic/forge_command",
+        "status": "failed"
+      },
+      "revision_anchor": "0000000000000000000000000000000000000000",
+      "schema_version": "centipede.evidence_bundle.v1",
+      "source_run_id": "era-sh-chain-proof-fixture"
+    }
+  ],
+  "final_runtime_mode": "completed_partial",
+  "final_runtime_mode_observed_at": "2026-01-01T00:00:00Z",
+  "lane_admissions": [
+    {
+      "admitted": true,
+      "lane_health_state": "degraded",
+      "lane_name": "era_accuracy",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "producer_id": "era-cli",
+      "producer_version": "fixture",
+      "reason": "Lane produced evidence with failures, blocked gates, or degraded checks.",
+      "record_id": "era-lane:era-sh-chain-proof-fixture:era_accuracy",
+      "record_type": "centipede.lane_admission_result",
+      "repository_id": "forge_command",
+      "revision_anchor": "0000000000000000000000000000000000000000",
+      "run_id": "era-sh-chain-proof-fixture",
+      "schema_version": "centipede.v1"
+    },
+    {
+      "admitted": true,
+      "lane_health_state": "available",
+      "lane_name": "era_read_only_invariant",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "producer_id": "era-cli",
+      "producer_version": "fixture",
+      "reason": "Synthetic fixture: ERA did not touch any repository.",
+      "record_id": "era-lane:era-sh-chain-proof-fixture:era_read_only_invariant",
+      "record_type": "centipede.lane_admission_result",
+      "repository_id": "forge_command",
+      "revision_anchor": "0000000000000000000000000000000000000000",
+      "run_id": "era-sh-chain-proof-fixture",
+      "schema_version": "centipede.v1"
+    },
+    {
+      "admitted": true,
+      "lane_health_state": "available",
+      "lane_name": "era_toolchain_availability",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "producer_id": "era-cli",
+      "producer_version": "fixture",
+      "reason": "Required detected tools were available or not applicable.",
+      "record_id": "era-lane:era-sh-chain-proof-fixture:era_toolchain_availability",
+      "record_type": "centipede.lane_admission_result",
+      "repository_id": "forge_command",
+      "revision_anchor": "0000000000000000000000000000000000000000",
+      "run_id": "era-sh-chain-proof-fixture",
+      "schema_version": "centipede.v1"
+    },
+    {
+      "admitted": true,
+      "lane_health_state": "available",
+      "lane_name": "era_evidence_hash_chain",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "producer_id": "era-cli",
+      "producer_version": "fixture",
+      "reason": "ERA artifacts include hash-chain validation inputs.",
+      "record_id": "era-lane:era-sh-chain-proof-fixture:era_evidence_hash_chain",
+      "record_type": "centipede.lane_admission_result",
+      "repository_id": "forge_command",
+      "revision_anchor": "0000000000000000000000000000000000000000",
+      "run_id": "era-sh-chain-proof-fixture",
+      "schema_version": "centipede.v1"
+    }
+  ],
+  "registry_projections": [],
+  "run": {
+    "observed_at": "2026-01-01T00:00:00Z",
+    "operator_note": "ERA accuracy run in full mode. ERA is read-only and exports evidence to Centipede.",
+    "producer_id": "era-cli",
+    "producer_version": "fixture",
+    "record_id": "era-run:era-sh-chain-proof-fixture",
+    "record_type": "centipede.run_created",
+    "repository_id": "forge_command",
+    "revision_anchor": "0000000000000000000000000000000000000000",
+    "run_class": "verification_only_run",
+    "run_id": "era-sh-chain-proof-fixture",
+    "runtime_mode": "created",
+    "schema_version": "centipede.v1"
+  },
+  "schema_version": "centipede.intake.v1",
+  "self_healing_projections": [
+    {
+      "affected_target_key": "era_self_healing_proof_gate",
+      "affected_target_type": "command",
+      "blocked_reason": null,
+      "confidence_posture": "high",
+      "evidence_bundle_id": "era-evidence:era-sh-chain-proof-fixture:finding:era_self_healing_proof_gate:1",
+      "execution_reach": "test_only",
+      "exploitability_posture": "unknown",
+      "finding_class": "accuracy_gate_failed",
+      "finding_id": "finding:era_self_healing_proof_gate:1",
+      "invalidated_reason": null,
+      "operator_review_required": true,
+      "produced_at": "2026-01-01T00:00:00Z",
+      "producer_id": "era-cli",
+      "producer_version": "fixture",
+      "projection_id": "era-sh-projection:era-sh-chain-proof-fixture:finding:era_self_healing_proof_gate:1",
+      "proof_type": "dynamic_reproduction",
+      "proposal_required": false,
+      "record_type": "centipede.self_healing_projection",
+      "repository_id": "forge_command",
+      "revision_anchor": "0000000000000000000000000000000000000000",
+      "run_class": "verification_only_run",
+      "schema_version": "centipede.self_healing_projection.v1",
+      "severity": "high",
+      "source_run_id": "era-sh-chain-proof-fixture",
+      "stale_after": null,
+      "suggested_remediation_kind": "verification_failure_triage",
+      "superseded_by": null,
+      "supporting_lane_ids": [
+        "era-lane:era-sh-chain-proof-fixture:era_accuracy"
+      ],
+      "supporting_trace_ids": [
+        "era-trace:era-sh-chain-proof-fixture:era_self_healing_proof_gate"
+      ],
+      "trigger_requirements": [
+        "operator_review",
+        "centipede_import_receipt",
+        "self_healing_intake_receipt"
+      ],
+      "valid_until": null
+    }
+  ],
+  "source_system": "era"
+}

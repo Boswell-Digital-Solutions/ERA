@@ -70,8 +70,14 @@ def detect_accuracy_commands(repo_path: Path) -> list[PlannedCommand]:
         PlannedCommand(
             lane="accuracy",
             command_id="bun_test",
-            label="bun test",
-            command=["bun", "test"],
+            label="bun run test",
+            # Invoke the project's declared `test` script (`bun run test`) rather
+            # than Bun's native `bun test` runner. A bare `bun test` only suits
+            # repos with native `bun:test` specs; for Vitest/Jest projects it runs
+            # the wrong runner and produces spurious accuracy-gate failures. The
+            # `bun_test_enabled` guard above already requires a declared `test`
+            # script, so `bun run test` always has a target to dispatch.
+            command=["bun", "run", "test"],
             cwd=str(repo_path),
             tool_name="bun",
             execute=bun_test_enabled,

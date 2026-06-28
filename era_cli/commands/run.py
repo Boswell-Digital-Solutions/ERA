@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import platform
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +64,24 @@ from era_integrations.centipede_export import write_centipede_export
 
 SUPPORTED_LANES = {"accuracy", "redundancy", "efficiency"}
 
+# ERA executes the target's own commands (cargo test, bun run build, manifest
+# workloads, ...). "Read-only" only means ERA does not modify the target's
+# tracked git tree; it is NOT a sandbox. Running an untrusted target is therefore
+# arbitrary code execution. Until a real execution sandbox exists (Slice 03),
+# the only way to proceed is an explicit operator trust attestation, and the CLI
+# defaults to untrusted so the operator-facing path is fail-closed.
+OPERATOR_TRUSTED = "operator_trusted"
+UNTRUSTED = "untrusted"
+_ALLOWED_TARGET_TRUST = {OPERATOR_TRUSTED}
+
+
+class UntrustedTargetError(RuntimeError):
+    """Raised when ERA is asked to execute against a target it cannot trust.
+
+    ERA has no execution sandbox in this build, so it refuses to run target
+    code unless the operator explicitly attests trust via ``--trusted-target``.
+    """
+
 
 def register(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--repo", required=True, help="Target repository path")
@@ -77,6 +96,15 @@ def register(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--artifacts-root",
         help="Override artifacts root for testing or local redirection",
+    )
+    parser.add_argument(
+        "--trusted-target",
+        action="store_true",
+        help=(
+            "Attest that the target repository and its build/test scripts are trusted. "
+            "Required because ERA executes the target's own commands and has no sandbox. "
+            "Without this flag ERA fails closed and runs nothing."
+        ),
     )
     parser.set_defaults(func=main)
 
@@ -166,18 +194,34 @@ def _determine_read_only_invariant(
     pre_snapshot: dict[str, Any],
     post_snapshot: dict[str, Any],
 ) -> tuple[str, str]:
+    """Compare pre/post git snapshots of the target.
+
+    This invariant verifies only that the target's tracked git tree and HEAD
+    were unchanged across the run. It does NOT prove ERA was side-effect free:
+    writes to untracked/git-ignored paths (node_modules, dist, target, caches),
+    writes outside the repository, network activity, and environment mutation
+    are all invisible to it. Honest scope is recorded as
+    read_only_invariant_scope = "target_git_tree_only".
+    """
     if pre_snapshot["head"] != post_snapshot["head"]:
         return (
             "head_changed_during_run",
-            "Target HEAD changed during the ERA run.",
+            "Target HEAD changed during the ERA run (git tree only; untracked and "
+            "out-of-repo effects are not observed).",
         )
     if pre_snapshot["status_short"] == post_snapshot["status_short"]:
         if pre_snapshot["is_dirty"]:
             return (
                 "preexisting_dirty_tree",
-                "The target repository was already dirty before the run and remained unchanged.",
+                "The target tracked working tree was already dirty before the run and "
+                "remained unchanged. Verifies the git tree only, not untracked or "
+                "out-of-repo effects.",
             )
-        return ("clean_verified", "Pre-run and post-run git state matched.")
+        return (
+            "clean_verified",
+            "Pre-run and post-run target git tree and HEAD matched. Verifies the git "
+            "tree only, not untracked paths, files outside the repo, or network.",
+        )
     return (
         "read_only_invariant_failed",
         "Post-run target git status differed from the pre-run snapshot.",
@@ -249,13 +293,30 @@ def execute_run(
     mode: str,
     baseline_ref: str | None = None,
     artifacts_root: Path | None = None,
+    target_trust: str = OPERATOR_TRUSTED,
 ) -> Path:
+    """Run ERA against ``repo_path``.
+
+    ``target_trust`` must be ``OPERATOR_TRUSTED`` to proceed: ERA executes the
+    target's own commands and has no sandbox, so any other value fails closed
+    with ``UntrustedTargetError``. The CLI defaults this to ``UNTRUSTED`` so the
+    operator-facing entry point is fail-closed; direct callers (tests, internal
+    tools) operating on trusted local fixtures pass the attestation explicitly.
+    """
     requested_lanes = [item for item in lanes if item]
     if not requested_lanes:
         raise ValueError("Provide at least one lane.")
     unsupported = [item for item in requested_lanes if item not in SUPPORTED_LANES]
     if unsupported:
         raise ValueError(f"Unsupported lanes requested: {', '.join(unsupported)}")
+
+    if target_trust not in _ALLOWED_TARGET_TRUST:
+        raise UntrustedTargetError(
+            "ERA executes the target's own commands (e.g. `cargo test`, `bun run build`) "
+            "and has no execution sandbox, so it refuses to run against an untrusted target. "
+            "Re-run with --trusted-target only after confirming you trust this repository and "
+            "its build/test scripts."
+        )
 
     repo_path = repo_path.resolve()
     if not repo_path.exists():
@@ -518,6 +579,13 @@ def execute_run(
         "completed_at": completed_at,
         "status": run_status,
         "operator_requested_by": getpass.getuser(),
+        "execution_posture": {
+            "executes_target_code": True,
+            "sandbox": "none",
+            "target_trust": target_trust,
+            "attested_by": getpass.getuser(),
+        },
+        "read_only_invariant_scope": "target_git_tree_only",
         "runner_version": __version__,
         "tool_versions": tool_versions,
         "environment": {
@@ -586,12 +654,18 @@ def execute_run(
 
 def main(args: argparse.Namespace) -> int:
     artifacts_root = Path(args.artifacts_root).resolve() if args.artifacts_root else None
-    run_dir = execute_run(
-        repo_path=Path(args.repo),
-        lanes=[item.strip() for item in args.lanes.split(",") if item.strip()],
-        mode=args.mode,
-        baseline_ref=args.baseline,
-        artifacts_root=artifacts_root,
-    )
+    target_trust = OPERATOR_TRUSTED if getattr(args, "trusted_target", False) else UNTRUSTED
+    try:
+        run_dir = execute_run(
+            repo_path=Path(args.repo),
+            lanes=[item.strip() for item in args.lanes.split(",") if item.strip()],
+            mode=args.mode,
+            baseline_ref=args.baseline,
+            artifacts_root=artifacts_root,
+            target_trust=target_trust,
+        )
+    except UntrustedTargetError as exc:
+        print(f"ERA refused to run (fail-closed): {exc}", file=sys.stderr)
+        return 2
     print(run_dir)
     return 0

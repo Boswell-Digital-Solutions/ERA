@@ -29,6 +29,7 @@ from era_core.efficiency import (
     collect_efficiency_manifest_tools,
     detect_efficiency_commands,
     load_efficiency_workload_manifest,
+    load_workload_executable_allowlist,
 )
 from era_core.git_info import (
     capture_git_snapshot,
@@ -379,7 +380,11 @@ def execute_run(
     if "efficiency" in requested_lanes:
         planned_commands.extend(
             apply_efficiency_tooling(
-                detect_efficiency_commands(repo_path, efficiency_manifest or {}),
+                detect_efficiency_commands(
+                    repo_path,
+                    efficiency_manifest or {},
+                    allowed_executables=load_workload_executable_allowlist(era_root),
+                ),
                 tool_report["tools"],
             )
         )

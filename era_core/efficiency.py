@@ -7,12 +7,63 @@ from typing import Any
 
 from era_core.artifact_paths import resolve_era_root, utc_now_text
 from era_core.contracts import build_tool_normalized_result
-from era_core.hashing import sha256_json
+from era_core.hashing import sha256_json, sha256_path
 from era_core.models import CommandResult, PlannedCommand
+
+# Efficiency workloads are operator-declared commands that ERA executes verbatim.
+# Restrict which executables may run to a conservative built-in set; operators can
+# extend it via config/efficiency_workload_allowlist.json. Anything outside the
+# effective allowlist is admitted as skipped, never executed.
+DEFAULT_WORKLOAD_EXECUTABLE_ALLOWLIST = frozenset(
+    {
+        "git",
+        "cargo",
+        "bun",
+        "node",
+        "npm",
+        "pnpm",
+        "yarn",
+        "python",
+        "python3",
+        "pytest",
+        "make",
+        "hyperfine",
+        "jscpd",
+        "knip",
+        "go",
+    }
+)
 
 
 def workload_manifests_dir(era_root: Path | None = None) -> Path:
     return (era_root or resolve_era_root()) / "config" / "workload_manifests"
+
+
+def workload_allowlist_path(era_root: Path | None = None) -> Path:
+    return (era_root or resolve_era_root()) / "config" / "efficiency_workload_allowlist.json"
+
+
+def load_workload_executable_allowlist(era_root: Path | None = None) -> set[str]:
+    """Return the effective set of executables permitted for efficiency workloads.
+
+    The built-in conservative default is always included; an optional operator
+    file extends it. The file may be either a JSON list or an object with an
+    ``allowed_executables`` list.
+    """
+    allowed = set(DEFAULT_WORKLOAD_EXECUTABLE_ALLOWLIST)
+    path = workload_allowlist_path(era_root)
+    if path.exists():
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        extra = payload.get("allowed_executables", []) if isinstance(payload, dict) else payload
+        if isinstance(extra, list):
+            allowed.update(str(item) for item in extra if isinstance(item, str) and item)
+    return allowed
+
+
+def _cwd_within_repo(repo_path: Path, cwd: Path) -> bool:
+    if cwd == repo_path:
+        return True
+    return repo_path in cwd.parents
 
 
 def workload_manifest_path(repo_path: Path, era_root: Path | None = None) -> Path:
@@ -32,6 +83,7 @@ def load_efficiency_workload_manifest(
             "repo_id": repo_id,
             "manifest_path": str(manifest_path),
             "manifest_status": "missing",
+            "manifest_sha256": None,
             "workloads": [],
             "loaded_at": utc_now_text(),
         }
@@ -43,6 +95,7 @@ def load_efficiency_workload_manifest(
         "repo_id": payload.get("repo_id", repo_id),
         "manifest_path": str(manifest_path),
         "manifest_status": "loaded",
+        "manifest_sha256": sha256_path(manifest_path),
         "description": payload.get("description"),
         "baseline_selection_policy": payload.get("baseline_selection_policy", "latest_prior_efficiency_run"),
         "workloads": workloads if isinstance(workloads, list) else [],
@@ -65,8 +118,12 @@ def collect_efficiency_manifest_tools(manifest: dict[str, Any]) -> list[str]:
 def detect_efficiency_commands(
     repo_path: Path,
     manifest: dict[str, Any],
+    allowed_executables: set[str] | None = None,
 ) -> list[PlannedCommand]:
     repo_path = repo_path.resolve()
+    allowed = allowed_executables if allowed_executables is not None else set(
+        DEFAULT_WORKLOAD_EXECUTABLE_ALLOWLIST
+    )
     commands: list[PlannedCommand] = []
     for index, workload in enumerate(manifest.get("workloads", []), start=1):
         command = workload.get("command", [])
@@ -76,11 +133,16 @@ def detect_efficiency_commands(
         iterations = int(workload.get("iterations", 3))
         cwd_subpath = workload.get("cwd_subpath", ".")
         success_exit_codes = tuple(workload.get("success_exit_codes", [0]))
+        command_is_valid = (
+            isinstance(command, list) and bool(command) and all(isinstance(item, str) for item in command)
+        )
+        resolved_cwd = (repo_path / cwd_subpath).resolve()
+        executable = command[0] if command_is_valid else None
         reason: str | None = None
         execute = True
         planned_status = "planned"
 
-        if not isinstance(command, list) or not command or not all(isinstance(item, str) for item in command):
+        if not command_is_valid:
             execute = False
             planned_status = "skipped"
             reason = "Workload command must be a non-empty list of strings."
@@ -92,6 +154,14 @@ def detect_efficiency_commands(
             execute = False
             planned_status = "skipped"
             reason = "Efficiency workloads require at least 2 iterations for variance classification."
+        elif not _cwd_within_repo(repo_path, resolved_cwd):
+            execute = False
+            planned_status = "skipped"
+            reason = f"Workload cwd_subpath `{cwd_subpath}` escapes the target repository."
+        elif executable not in allowed:
+            execute = False
+            planned_status = "skipped"
+            reason = f"Workload executable `{executable}` is not in the efficiency workload allowlist."
 
         command_id = f"efficiency_{re.sub(r'[^a-z0-9]+', '_', workload_id.lower()).strip('_')}"
         commands.append(
@@ -100,7 +170,7 @@ def detect_efficiency_commands(
                 command_id=command_id,
                 label=label,
                 command=command if isinstance(command, list) else [],
-                cwd=str((repo_path / cwd_subpath).resolve()),
+                cwd=str(resolved_cwd),
                 tool_name=str(command[0]) if isinstance(command, list) and command else "unknown",
                 execute=execute,
                 planned_status=planned_status,
@@ -113,9 +183,12 @@ def detect_efficiency_commands(
                     "workload_category": workload.get("category", "unspecified"),
                     "workload_description": workload.get("description"),
                     "workload_runner": runner,
+                    "workload_executable": executable,
+                    "cwd_subpath": cwd_subpath,
                     "regression_threshold_pct": float(workload.get("regression_threshold_pct", 10.0)),
                     "improvement_threshold_pct": float(workload.get("improvement_threshold_pct", 10.0)),
                     "manifest_path": manifest.get("manifest_path"),
+                    "manifest_sha256": manifest.get("manifest_sha256"),
                 },
             )
         )

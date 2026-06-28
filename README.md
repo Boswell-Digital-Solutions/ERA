@@ -102,6 +102,24 @@ timing variance is not unstable
 a baseline efficiency artifact exists
 ```
 
+Workload admission is bounded:
+
+```text
+cwd_subpath must resolve inside the target repository (escapes are skipped, not run)
+the workload executable must be on the effective allowlist
+manifest provenance (manifest_sha256) is recorded in the run evidence
+```
+
+The effective allowlist is a conservative built-in set plus any executables an
+operator declares in:
+
+```text
+ERA/config/efficiency_workload_allowlist.json
+```
+
+Workloads outside the allowlist, or with an escaping `cwd_subpath`, are admitted
+as `skipped` with a reason and are never executed.
+
 ## Unified Finding Model
 
 ERA-02 standardizes the internal evidence chain as:

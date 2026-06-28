@@ -26,20 +26,46 @@ ERA reports.
 ERA does not fix.
 ```
 
+## Execution Posture (read this before running)
+
+ERA runs the target's own commands — `cargo check`, `cargo test`, `bun run test`,
+`bun run build`, redundancy scanners, and manifest-declared efficiency workloads.
+**That is arbitrary code execution.** "Read-only" here means only that ERA does
+not modify the target's tracked git tree; it is verified after the fact by a
+git-tree comparison (`read_only_invariant_scope = "target_git_tree_only"`). That
+check does **not** observe writes to untracked or git-ignored paths, writes
+outside the repository, network activity, or environment changes, and ERA has no
+execution sandbox yet.
+
+Because of this, ERA fails closed: `era run` refuses to execute unless you
+explicitly attest that the target is trusted with `--trusted-target`. Only run
+trusted, in-house repositories until a real execution sandbox lands.
+
+```bash
+python -m era_cli run --repo /path/to/trusted/repo --lanes accuracy --mode full --trusted-target
+```
+
+Each run records an `execution_posture` block (`executes_target_code`, `sandbox`,
+`target_trust`, `attested_by`) in `run.json` so the receipt reflects how the run
+was authorized.
+
 ## Usage
 
 Run from the `ERA/` directory:
 
 ```bash
-python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes accuracy --mode full
-python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes accuracy --mode changed-files --baseline main
-python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes redundancy --mode full
-python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes efficiency --mode full
-python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes accuracy,redundancy --mode full
-python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes accuracy,redundancy,efficiency --mode full
+python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes accuracy --mode full --trusted-target
+python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes accuracy --mode changed-files --baseline main --trusted-target
+python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes redundancy --mode full --trusted-target
+python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes efficiency --mode full --trusted-target
+python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes accuracy,redundancy --mode full --trusted-target
+python -m era_cli run --repo /home/charlie/Forge/ecosystem/Forge_Command --lanes accuracy,redundancy,efficiency --mode full --trusted-target
 python -m era_cli report --latest
 python -m era_cli validate --latest
 ```
+
+`--trusted-target` is required for every `run`; without it ERA fails closed and
+runs nothing. See **Execution Posture** below.
 
 Artifacts are written under:
 
@@ -75,6 +101,24 @@ the workload ran successfully
 timing variance is not unstable
 a baseline efficiency artifact exists
 ```
+
+Workload admission is bounded:
+
+```text
+cwd_subpath must resolve inside the target repository (escapes are skipped, not run)
+the workload executable must be on the effective allowlist
+manifest provenance (manifest_sha256) is recorded in the run evidence
+```
+
+The effective allowlist is a conservative built-in set plus any executables an
+operator declares in:
+
+```text
+ERA/config/efficiency_workload_allowlist.json
+```
+
+Workloads outside the allowlist, or with an escaping `cwd_subpath`, are admitted
+as `skipped` with a reason and are never executed.
 
 ## Unified Finding Model
 

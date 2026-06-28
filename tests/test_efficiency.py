@@ -41,6 +41,15 @@ def write_efficiency_manifest(era_root: Path, repo_name: str, command: list[str]
     )
 
 
+def write_workload_allowlist(era_root: Path, executables: list[str]) -> None:
+    config_dir = era_root / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "efficiency_workload_allowlist.json").write_text(
+        json.dumps({"allowed_executables": executables}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 class EfficiencyTests(unittest.TestCase):
     def test_efficiency_without_manifest_is_unproven(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -131,6 +140,9 @@ class EfficiencyTests(unittest.TestCase):
                 repo.name,
                 ["definitely_missing_tool_for_era", "--version"],
             )
+            # Allowlist the sentinel so it reaches missing-tool detection rather
+            # than being rejected at the allowlist gate first.
+            write_workload_allowlist(era_root, ["definitely_missing_tool_for_era"])
             run_dir = execute_run(
                 repo_path=repo,
                 lanes=["efficiency"],
@@ -141,6 +153,94 @@ class EfficiencyTests(unittest.TestCase):
                 (run_dir / "evidence" / "efficiency" / "efficiency_evidence_bundle.json").read_text(encoding="utf-8")
             )
             self.assertEqual(bundle["command_results"][0]["status"], "blocked_by_missing_tool")
+
+
+class EfficiencyManifestHardeningTests(unittest.TestCase):
+    def _run(self, era_root: Path, repo: Path) -> Path:
+        return execute_run(
+            repo_path=repo,
+            lanes=["efficiency"],
+            mode="full",
+            artifacts_root=era_root / "artifacts" / "era-runs",
+        )
+
+    def test_cwd_subpath_escape_is_skipped_not_executed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            temp_path = Path(temp_root)
+            era_root = temp_path / "era"
+            repo = temp_path / "repo"
+            era_root.mkdir()
+            repo.mkdir()
+            init_git_repo(repo)
+            manifests_dir = era_root / "config" / "workload_manifests"
+            manifests_dir.mkdir(parents=True, exist_ok=True)
+            (manifests_dir / f"{repo.name.lower()}.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "EfficiencyWorkloadManifest.v1",
+                        "repo_id": repo.name,
+                        "workloads": [
+                            {
+                                "workload_id": "escape_probe",
+                                "command": ["git", "status", "--short"],
+                                "cwd_subpath": "../../../",
+                                "runner": "internal_timer",
+                                "iterations": 3,
+                            }
+                        ],
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            run_dir = self._run(era_root, repo)
+            bundle = json.loads(
+                (run_dir / "evidence" / "efficiency" / "efficiency_evidence_bundle.json").read_text(encoding="utf-8")
+            )
+            result = bundle["command_results"][0]
+            self.assertEqual(result["status"], "skipped")
+            self.assertIsNone(result["exit_code"])
+            self.assertIn("escapes the target repository", result["blocked_reason"])
+
+    def test_unapproved_executable_is_skipped_not_executed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            temp_path = Path(temp_root)
+            era_root = temp_path / "era"
+            repo = temp_path / "repo"
+            era_root.mkdir()
+            repo.mkdir()
+            init_git_repo(repo)
+            # `bash` is not in the default allowlist and no override is provided.
+            write_efficiency_manifest(era_root, repo.name, ["bash", "-c", "echo hi"])
+            run_dir = self._run(era_root, repo)
+            bundle = json.loads(
+                (run_dir / "evidence" / "efficiency" / "efficiency_evidence_bundle.json").read_text(encoding="utf-8")
+            )
+            result = bundle["command_results"][0]
+            self.assertEqual(result["status"], "skipped")
+            self.assertIn("not in the efficiency workload allowlist", result["blocked_reason"])
+
+    def test_manifest_provenance_hash_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            temp_path = Path(temp_root)
+            era_root = temp_path / "era"
+            repo = temp_path / "repo"
+            era_root.mkdir()
+            repo.mkdir()
+            init_git_repo(repo)
+            write_efficiency_manifest(
+                era_root,
+                repo.name,
+                ["python3", "-c", "import time; time.sleep(0.01)"],
+            )
+            run_dir = self._run(era_root, repo)
+            manifest = json.loads(
+                (run_dir / "evidence" / "efficiency" / "workload_manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["manifest_status"], "loaded")
+            self.assertIsInstance(manifest["manifest_sha256"], str)
+            self.assertEqual(len(manifest["manifest_sha256"]), 64)
 
 
 if __name__ == "__main__":

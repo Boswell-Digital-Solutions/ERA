@@ -48,6 +48,13 @@ from era_core.redundancy import (
     detect_redundancy_commands,
     load_intentional_redundancy_exceptions,
 )
+from era_core.sandbox import (
+    MODE_AUTO,
+    MODE_OFF,
+    SANDBOX_CONTAINED,
+    none_posture,
+    resolve_sandbox,
+)
 from era_core.review_writer import (
     determine_accuracy_classification,
     determine_efficiency_classification,
@@ -103,8 +110,17 @@ def register(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help=(
             "Attest that the target repository and its build/test scripts are trusted. "
-            "Required because ERA executes the target's own commands and has no sandbox. "
-            "Without this flag ERA fails closed and runs nothing."
+            "Lets ERA run unsandboxed. Without either a usable sandbox or this flag, ERA "
+            "fails closed and runs nothing."
+        ),
+    )
+    parser.add_argument(
+        "--no-sandbox",
+        action="store_true",
+        help=(
+            "Disable contained execution. ERA then requires --trusted-target to run. By "
+            "default ERA auto-uses unshare-based containment (no external network; the "
+            "target tree is overlay-protected) when the host supports it."
         ),
     )
     parser.set_defaults(func=main)
@@ -295,13 +311,16 @@ def execute_run(
     baseline_ref: str | None = None,
     artifacts_root: Path | None = None,
     target_trust: str = OPERATOR_TRUSTED,
+    sandbox_mode: str = MODE_OFF,
 ) -> Path:
     """Run ERA against ``repo_path``.
 
-    ``target_trust`` must be ``OPERATOR_TRUSTED`` to proceed: ERA executes the
-    target's own commands and has no sandbox, so any other value fails closed
-    with ``UntrustedTargetError``. The CLI defaults this to ``UNTRUSTED`` so the
-    operator-facing entry point is fail-closed; direct callers (tests, internal
+    ERA executes the target's own commands, so a run proceeds only when it is
+    either contained or explicitly trusted: a usable sandbox (``sandbox_mode``
+    resolves to a contained backend) OR ``target_trust == OPERATOR_TRUSTED``.
+    Otherwise it fails closed with ``UntrustedTargetError``. The CLI defaults to
+    ``MODE_AUTO`` + ``UNTRUSTED`` so contained execution is preferred and an
+    untrusted target with no sandbox is refused. Direct callers (tests, internal
     tools) operating on trusted local fixtures pass the attestation explicitly.
     """
     requested_lanes = [item for item in lanes if item]
@@ -311,12 +330,15 @@ def execute_run(
     if unsupported:
         raise ValueError(f"Unsupported lanes requested: {', '.join(unsupported)}")
 
-    if target_trust not in _ALLOWED_TARGET_TRUST:
+    sandbox = resolve_sandbox(sandbox_mode)
+    contained = sandbox is not None and sandbox.level == SANDBOX_CONTAINED
+    if target_trust not in _ALLOWED_TARGET_TRUST and not contained:
         raise UntrustedTargetError(
-            "ERA executes the target's own commands (e.g. `cargo test`, `bun run build`) "
-            "and has no execution sandbox, so it refuses to run against an untrusted target. "
-            "Re-run with --trusted-target only after confirming you trust this repository and "
-            "its build/test scripts."
+            "ERA executes the target's own commands (e.g. `cargo test`, `bun run build`). "
+            "No usable execution sandbox was available and the target was not attested as "
+            "trusted, so ERA refused to run. Re-run with --trusted-target after confirming "
+            "you trust this repository and its build/test scripts, or run on a host where "
+            "unshare-based containment is available."
         )
 
     repo_path = repo_path.resolve()
@@ -389,15 +411,20 @@ def execute_run(
             )
         )
 
-    command_results = run_planned_commands(
-        planned_commands,
-        {
-            "accuracy": run_paths.accuracy_commands_dir,
-            "redundancy": run_paths.redundancy_commands_dir,
-            "efficiency": run_paths.efficiency_commands_dir,
-        },
-        tool_versions,
-    )
+    try:
+        command_results = run_planned_commands(
+            planned_commands,
+            {
+                "accuracy": run_paths.accuracy_commands_dir,
+                "redundancy": run_paths.redundancy_commands_dir,
+                "efficiency": run_paths.efficiency_commands_dir,
+            },
+            tool_versions,
+            sandbox=sandbox,
+        )
+    finally:
+        if sandbox is not None:
+            sandbox.cleanup()
 
     if selection_artifact is not None and mode == "changed-files":
         selection_artifact["full_run_executed"] = any(
@@ -586,11 +613,13 @@ def execute_run(
         "operator_requested_by": getpass.getuser(),
         "execution_posture": {
             "executes_target_code": True,
-            "sandbox": "none",
+            **(sandbox.posture() if sandbox is not None else none_posture()),
             "target_trust": target_trust,
             "attested_by": getpass.getuser(),
         },
-        "read_only_invariant_scope": "target_git_tree_only",
+        "read_only_invariant_scope": (
+            "enforced_by_overlay" if contained else "target_git_tree_only"
+        ),
         "runner_version": __version__,
         "tool_versions": tool_versions,
         "environment": {
@@ -660,6 +689,7 @@ def execute_run(
 def main(args: argparse.Namespace) -> int:
     artifacts_root = Path(args.artifacts_root).resolve() if args.artifacts_root else None
     target_trust = OPERATOR_TRUSTED if getattr(args, "trusted_target", False) else UNTRUSTED
+    sandbox_mode = MODE_OFF if getattr(args, "no_sandbox", False) else MODE_AUTO
     try:
         run_dir = execute_run(
             repo_path=Path(args.repo),
@@ -668,6 +698,7 @@ def main(args: argparse.Namespace) -> int:
             baseline_ref=args.baseline,
             artifacts_root=artifacts_root,
             target_trust=target_trust,
+            sandbox_mode=sandbox_mode,
         )
     except UntrustedTargetError as exc:
         print(f"ERA refused to run (fail-closed): {exc}", file=sys.stderr)

@@ -30,24 +30,46 @@ ERA does not fix.
 
 ERA runs the target's own commands — `cargo check`, `cargo test`, `bun run test`,
 `bun run build`, redundancy scanners, and manifest-declared efficiency workloads.
-**That is arbitrary code execution.** "Read-only" here means only that ERA does
-not modify the target's tracked git tree; it is verified after the fact by a
-git-tree comparison (`read_only_invariant_scope = "target_git_tree_only"`). That
-check does **not** observe writes to untracked or git-ignored paths, writes
-outside the repository, network activity, or environment changes, and ERA has no
-execution sandbox yet.
+**That is arbitrary code execution**, so ERA will not run unless the work is
+either contained or explicitly trusted. It fails closed otherwise.
 
-Because of this, ERA fails closed: `era run` refuses to execute unless you
-explicitly attest that the target is trusted with `--trusted-target`. Only run
-trusted, in-house repositories until a real execution sandbox lands.
+By default (`--no-sandbox` not set) ERA auto-uses **contained execution** when the
+host supports it: each command runs in a Linux namespace with
+
+```text
+no external network (network = isolated)
+the target repository presented through an overlay, so the real working
+tree is physically immutable while builds still write into a throwaway layer
+(target_filesystem = overlay_protected)
+```
+
+When a contained run is active, `read_only_invariant_scope` becomes
+`enforced_by_overlay` — the target cannot be modified by construction, not merely
+checked after the fact. Disclosed limitation: a contained run is not a full jail
+(the namespace can still read other host paths); a full filesystem jail is future
+work. A contained run also has no network, so non-hermetic builds that fetch
+dependencies will fail — which is the intended, honest signal.
+
+Resolution order for whether a run proceeds:
+
+```text
+contained sandbox available  -> run contained (no --trusted-target needed)
+else --trusted-target given   -> run unsandboxed (operator accepts the risk)
+else                          -> fail closed, run nothing
+```
 
 ```bash
+# Host with containment: runs contained, no attestation required
+python -m era_cli run --repo /path/to/repo --lanes accuracy --mode full
+
+# No containment available, or --no-sandbox: attest trust explicitly
 python -m era_cli run --repo /path/to/trusted/repo --lanes accuracy --mode full --trusted-target
 ```
 
 Each run records an `execution_posture` block (`executes_target_code`, `sandbox`,
-`target_trust`, `attested_by`) in `run.json` so the receipt reflects how the run
-was authorized.
+`sandbox_backend`, `network`, `target_filesystem`, `target_trust`, `attested_by`)
+in `run.json` so the receipt reflects exactly how the run was contained and
+authorized.
 
 ## Usage
 
@@ -64,8 +86,10 @@ python -m era_cli report --latest
 python -m era_cli validate --latest
 ```
 
-`--trusted-target` is required for every `run`; without it ERA fails closed and
-runs nothing. See **Execution Posture** below.
+On a host with containment support these run contained automatically;
+`--trusted-target` is only needed when containment is unavailable or disabled
+with `--no-sandbox`. Without either, ERA fails closed. See **Execution Posture**
+below.
 
 Artifacts are written under:
 

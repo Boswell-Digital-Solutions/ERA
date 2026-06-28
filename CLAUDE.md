@@ -7,7 +7,7 @@ Manifest hash: sha256:0233ce78c2a079130e4decd70acea2a4c66511a0adcd395a126a2384b2
 Receipt: receipts/repo-context/latest.json
 -->
 
-# AGENTS.md - ERA Agent Instructions
+# CLAUDE.md - ERA Agent Instructions
 
 ## Repo Identity
 

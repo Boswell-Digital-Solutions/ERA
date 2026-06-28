@@ -1,0 +1,106 @@
+schema_version: "RepoManifest.v1"
+
+repo:
+  full_name: "Boswecw/ERA"
+  local_name: "ERA"
+  package_name: "era"
+  default_branch: "master"
+  repo_class: "local_assurance_evidence_service"
+
+identity:
+  product_name: "ERA"
+  one_line: "Bounded local read-only evidence subsystem that finds, measures, proves, and reports verification evidence for the Forge ecosystem."
+  authority_role: "local_verification_and_evidence_production"
+
+owns:
+  - local read-only accuracy, redundancy, and efficiency evaluation
+  - bounded execution of target-declared verification commands
+  - unified finding normalization chain (raw, normalized, draft, finding, score)
+  - evidence integrity hash chain and run receipts
+  - changed-files / RTS selection metadata
+  - Centipede-compatible evidence export bundles
+  - truthful read-only-to-target invariant reporting
+
+does_not_own:
+  - patches, merges, or remediation application
+  - approval, promotion, or operator decisions
+  - canonical ecosystem memory
+  - shared cross-repo schema doctrine
+  - durable reconciliation or ledger authority
+  - model routing or candidate generation
+  - command-plane operator authority
+
+upstream_authorities:
+  forge_contract_core:
+    owns: "shared cross-repo schemas, enums, validators, and the Centipede intake contract surface"
+  Forge_Command:
+    owns: "operator review, Centipede import, self-healing queue, and command-plane authority"
+  DataForge Local:
+    owns: "durable local evidence storage and run-record persistence"
+  Forge Local Runtime:
+    owns: "shared local-runtime doctrine and degraded-state vocabulary"
+
+downstream_consumers:
+  - Forge_Command
+  - Centipede evidence reconciliation
+  - operator verification workflows
+
+canonical_files:
+  - repo.manifest.yaml
+  - README.md
+  - pyproject.toml
+  - doc/ERASYSTEM.md
+  - doc/system/_index.md
+  - docs/ERA_Plan_Set_MD/00-README.md
+
+generated_files:
+  - AGENTS.md
+  - CLAUDE.md
+  - CODEX.md
+  - GEMINI.md
+
+agent_edit_policy:
+  may_edit:
+    - era_cli/**
+    - era_core/**
+    - era_integrations/**
+    - tests/**
+    - config/**
+    - docs/**
+    - doc/system/**
+    - scripts/**
+  must_not_edit_directly:
+    - AGENTS.md
+    - CLAUDE.md
+    - CODEX.md
+    - GEMINI.md
+  must_regenerate:
+    - AGENTS.md
+    - CLAUDE.md
+    - CODEX.md
+    - GEMINI.md
+
+verification:
+  required_identity_checks:
+    - repository_full_name
+    - local_directory_name
+    - package_name
+    - README title
+    - default_branch
+    - canonical_files_exist
+    - generated_instruction_hashes_match
+  test_commands:
+    - python3 -m pytest
+  build_commands:
+    - bash doc/system/BUILD.sh
+  safety_rules:
+    - "ERA finds, measures, proves, and reports; it never fixes, patches, merges, or promotes."
+    - "ERA executes target-declared commands, so every run is code execution: keep runs operator-explicit and fail closed against untrusted targets."
+    - "All findings stay candidate-only: safe_to_autofix remains false and operator review is mandatory."
+    - "Evidence integrity is not authenticity; ERA receipts are not canonical truth until reconciled and reviewed downstream."
+    - "Shared cross-repo contracts belong to forge_contract_core; ERA must not become the unilateral owner of the Centipede intake schema."
+  llm_rules:
+    - "Start from the ERA repo root and confirm repo.manifest.yaml before reading architectural meaning from files."
+    - "Preserve the read-only-to-target posture: never add patch, merge, promotion, or approval authority."
+    - "Keep the evidence chain (raw to normalized to draft to finding to score) intact and contract-validated."
+    - "Detailed per-slice operator behavior lives in docs/ERA-Agent-Operational-Notes.md."

@@ -1,7 +1,7 @@
 schema_version: "RepoManifest.v1"
 
 repo:
-  full_name: "Boswecw/ERA"
+  full_name: "Boswell-Digital-Solutions/ERA"
   local_name: "ERA"
   package_name: "era"
   default_branch: "master"

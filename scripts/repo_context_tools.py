@@ -277,12 +277,6 @@ Regenerate these files after manifest changes:
 {list_section(policy["must_regenerate"])}
 ## Verification Commands
 
-Context and drift:
-
-- python3 scripts/generate_agent_instructions.py
-- python3 scripts/check_agent_instruction_drift.py
-- python3 scripts/verify_repo_context.py
-
 Tests:
 
 {list_section(verification["test_commands"])}
@@ -295,13 +289,12 @@ Builds:
 ## Repo-Specific LLM Rules
 
 {list_section(verification["llm_rules"])}
-## Required Preflight Before Cross-Repo Work
+## Cross-Repo Boundary
 
-- Confirm the target repo path and git remote before reading architectural meaning from files.
-- Confirm the repo class and authority role from repo.manifest.yaml.
-- List the files you plan to read and edit.
+- Confirm the target repo path and git remote before reading architectural meaning from a file. Several Forge systems share a brand name across two families, and the path is what tells them apart.
 - Do not mutate upstream authority repos unless the work order explicitly allows it.
-- Run python3 scripts/verify_repo_context.py before claiming this repo is agent-governed.
+
+This file is generated from repo.manifest.yaml. After editing the manifest, run `python3 scripts/generate_agent_instructions.py`.
 """
 
 

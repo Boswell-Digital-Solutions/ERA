@@ -25,13 +25,13 @@
 
         | Part | File | Contents |
         | --- | --- | --- |
-        | §1 | `00_overview/01-overview.md` | 01 Overview |
-| §2 | `10_service-contract/02-contract-surface.md` | 02 Contract Surface |
-| §3 | `20_runtime/03-runtime-boundary.md` | 03 Runtime Boundary |
-| §4 | `30_dependencies/04-dependencies.md` | 04 Dependencies |
-| §5 | `40_governance/05-governance.md` | 05 Governance |
-| §6 | `50_operations/06-verification.md` | 06 Verification |
-| §7 | `99_appendices/90-appendices.md` | 90 Appendices |
+        | §1 | `01-overview.md` | 01 Overview |
+| §2 | `02-contract-surface.md` | 02 Contract Surface |
+| §3 | `03-runtime-boundary.md` | 03 Runtime Boundary |
+| §4 | `04-dependencies.md` | 04 Dependencies |
+| §5 | `05-governance.md` | 05 Governance |
+| §6 | `06-verification.md` | 06 Verification |
+| §7 | `90-appendices.md` | 90 Appendices |
 
         ## Quick Assembly
 

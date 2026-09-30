@@ -262,7 +262,7 @@ def _write_eval_evidence(
             "telemetry_notes": evidence.get("telemetry_notes", []),
         }
         artifacts = {**evidence, "comparison": eval_comparisons.get(workload_id)}
-        for key in ("fingerprint", "quality_gate", "metric_vector", "comparison"):
+        for key in ("fingerprint", "quality_gate", "metric_vector", "judge_audit", "comparison"):
             if artifacts[key] is not None:
                 path = directory / f"{key}.json"
                 write_json(path, artifacts[key])

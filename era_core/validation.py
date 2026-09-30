@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from era_core.eval_validation import validate_eval_evidence
 from era_core.hashing import sha256_json, sha256_path
 from era_integrations.centipede_export import validate_centipede_export_bundle
 
@@ -428,6 +429,15 @@ def validate_run_dir(run_dir: Path) -> dict[str, object]:
                 errors.append("Efficiency baseline artifact is missing schema_version.")
             if baseline.get("run_id") != run_artifact["run_id"]:
                 errors.append("Efficiency baseline artifact run_id does not match run.json.")
+            errors.extend(
+                validate_eval_evidence(
+                    run_dir=run_dir,
+                    run_artifact=run_artifact,
+                    efficiency_bundle=evidence_bundles["efficiency"],
+                    baseline_artifact=baseline,
+                    chain=(hashes.get("evidence_hash_chain") or {}),
+                )
+            )
 
     for field in (
         "target_manifest_path",

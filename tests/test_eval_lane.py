@@ -35,7 +35,9 @@ EVALUATION = {
 }
 
 
-def write_v2_manifest(era_root: Path, repo_name: str, evaluation: dict | None = None) -> None:
+def write_v2_manifest(
+    era_root: Path, repo_name: str, evaluation: dict | None = None, command: list[str] | None = None
+) -> None:
     manifests = era_root / "config" / "workload_manifests"
     manifests.mkdir(parents=True, exist_ok=True)
     (manifests / f"{repo_name.lower()}.json").write_text(
@@ -48,7 +50,7 @@ def write_v2_manifest(era_root: Path, repo_name: str, evaluation: dict | None = 
                         "workload_id": "eval_probe",
                         "label": "eval probe",
                         "category": "runtime_benchmark",
-                        "command": ["python3", "-c", "import time; time.sleep(0.01)"],
+                        "command": command or ["python3", "-c", "import time; time.sleep(0.01)"],
                         "cwd_subpath": ".",
                         "runner": "internal_timer",
                         "iterations": 3,

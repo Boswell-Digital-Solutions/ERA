@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from era_core.eval_claims import decide_claim, load_prior_evidence, select_eligible_baseline
-from era_core.eval_lane import eval_policy, primary_metric, required_dimensions, workload_dirname
+from era_core.eval_lane import eval_policy, primary_metric, required_dimensions, sample_policy, workload_dirname
 
 COMPARED_FIELDS = (
     "quality_status",
@@ -76,6 +76,8 @@ def reconstruct_claim(run_dir: Path, workload_id: str) -> dict[str, Any]:
         regression_threshold_pct=float(workload.get("regression_threshold_pct", 10.0)),
         improvement_threshold_pct=float(workload.get("improvement_threshold_pct", 10.0)),
         primary_metric=primary_metric(policy),
+        min_samples=int(sample_policy(policy).get("min_samples", 0)),
+        require_ci_separation=bool(sample_policy(policy).get("require_ci_separation", False)),
     ) | {"baseline_run_id": (selection["baseline"] or {}).get("run_id"),
          "baseline_fingerprint_id": ((selection["baseline"] or {}).get("fingerprint") or {}).get("fingerprint_id")}
 

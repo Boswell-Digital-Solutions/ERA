@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from era_core.eval_comparability import compare_fingerprints, select_baseline
+from era_core.eval_stats import intervals_overlap
 from era_core.eval_contracts import (
     build_quality_efficiency_comparison,
     check_evidence_linkage,
@@ -166,6 +167,8 @@ def decide_claim(
     regression_threshold_pct: float,
     improvement_threshold_pct: float,
     primary_metric: str = PRIMARY_METRIC,
+    min_samples: int = 0,
+    require_ci_separation: bool = False,
 ) -> dict[str, Any]:
     """Return the status fields of a ``QualityEfficiencyComparison.v1``.
 
@@ -231,6 +234,17 @@ def decide_claim(
     result["metric_deltas"] = _all_deltas(
         vector, baseline_vector, regression_threshold_pct, improvement_threshold_pct
     )
+    thin = [
+        label
+        for label, source in (("candidate", vector), ("baseline", baseline_vector))
+        if min_samples and _sample_count(source, primary_metric) < min_samples
+    ]
+    if thin:
+        result["efficiency_status"] = "unstable"
+        return block(
+            "no_claim_unstable",
+            [f"The {' and '.join(thin)} `{primary_metric}` has fewer than the required {min_samples} samples."],
+        )
     unstable = [
         label
         for label, source in (("candidate", vector), ("baseline", baseline_vector))
@@ -241,6 +255,17 @@ def decide_claim(
         return block("no_claim_unstable", [f"The {' and '.join(unstable)} `{primary_metric}` is too unstable for a claim."])
 
     outcome = result["metric_deltas"][primary_metric]["outcome"]
+    if require_ci_separation and outcome in {"better", "worse"}:
+        overlap = intervals_overlap(_interval(vector, primary_metric), _interval(baseline_vector, primary_metric))
+        if overlap is None:
+            result["efficiency_status"] = "unstable"
+            return block("no_claim_unstable", [f"No confidence interval exists for `{primary_metric}`. Too few samples."])
+        if overlap:
+            result["efficiency_status"] = "unstable"
+            return block(
+                "no_claim_unstable",
+                [f"The 95 percent intervals of `{primary_metric}` overlap, so the difference is not established."],
+            )
     result["efficiency_status"] = {"better": "improvement", "worse": "regression", "within_range": "within_range"}[outcome]
     result["claim_status"] = "permitted"
     return result
@@ -249,6 +274,16 @@ def decide_claim(
 def _stability(vector: dict[str, Any], metric: str) -> str | None:
     uncertainty = vector["variance_or_uncertainty"]
     return (uncertainty.get("per_metric") or {}).get(metric) or uncertainty.get("variance_classification")
+
+
+def _sample_count(vector: dict[str, Any], metric: str) -> int:
+    counts = vector["variance_or_uncertainty"].get("per_metric_sample_count") or {}
+    return int(counts.get(metric, vector.get("sample_count", 0)))
+
+
+def _interval(vector: dict[str, Any], metric: str) -> dict[str, Any] | None:
+    entry = (vector["variance_or_uncertainty"].get("uncertainty") or {}).get(metric)
+    return entry if isinstance(entry, dict) and "ci_low" in entry else None
 
 
 def _all_deltas(
@@ -265,6 +300,11 @@ def _all_deltas(
         delta = _metric_delta(candidate_metric, baseline_metric)
         delta["candidate_stability"] = _stability(vector, name)
         delta["baseline_stability"] = _stability(baseline_vector, name)
+        delta["candidate_interval"] = _interval(vector, name)
+        delta["baseline_interval"] = _interval(baseline_vector, name)
+        if candidate_metric.get("scope") or baseline_metric.get("scope"):
+            delta["scope"] = candidate_metric.get("scope")
+            delta["baseline_scope"] = baseline_metric.get("scope")
         direction = candidate_metric["direction"]
         if direction != baseline_metric["direction"]:
             delta["outcome"] = "direction_mismatch"

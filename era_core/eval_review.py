@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from era_core.eval_telemetry import ENERGY_SCOPES
+
 EVAL_KINDS = ("fingerprint", "quality_gate", "metric_vector", "comparison")
 
 
@@ -28,6 +30,12 @@ def load_eval_artifacts(run_root: Path, refs: dict[str, Any]) -> dict[str, dict[
 
 def eval_hash_values(refs: dict[str, Any]) -> list[str]:
     return [entry[kind]["sha256"] for entry in (refs or {}).values() for kind in EVAL_KINDS if entry.get(kind)]
+
+
+def _interval_text(interval: dict[str, Any] | None) -> str:
+    if not interval:
+        return "`not available`"
+    return f"`[{interval['ci_low']}, {interval['ci_high']}]`"
 
 
 def _fmt(value: Any) -> str:
@@ -91,6 +99,21 @@ def render_eval_section(refs: dict[str, Any], artifacts: dict[str, dict[str, Any
                 )
         else:
             lines.append("| none | n/a | n/a | n/a | n/a | n/a | n/a |")
+        primary_delta = deltas.get(primary)
+        if primary_delta is not None:
+            lines.append(
+                "- uncertainty (bootstrap median, 95 percent):"
+                f" candidate {_interval_text(primary_delta.get('candidate_interval'))},"
+                f" baseline {_interval_text(primary_delta.get('baseline_interval'))}"
+            )
+        for name, metric in sorted(((vector or {}).get("metrics") or {}).items()):
+            if metric.get("scope"):
+                lines.append(
+                    f"- energy scope for `{name}`: `{metric['scope']}` ({ENERGY_SCOPES.get(metric['scope'], 'unknown scope')})"
+                )
+        warmup = ((vector or {}).get("variance_or_uncertainty") or {}).get("warmup_iterations")
+        if warmup:
+            lines.append(f"- warmup iterations discarded: `{warmup}`")
         for problem in entry.get("telemetry_problems", []):
             lines.append(f"- telemetry problem: {problem}")
         for note in entry.get("telemetry_notes", []):

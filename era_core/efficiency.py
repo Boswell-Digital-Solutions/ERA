@@ -115,6 +115,19 @@ def collect_efficiency_manifest_tools(manifest: dict[str, Any]) -> list[str]:
     return sorted({tool for tool in tools if tool})
 
 
+MAX_WARMUP_ITERATIONS = 20
+
+
+def _warmup_iterations(workload: dict[str, Any]) -> int:
+    """Warmup runs from ``evaluation.sample_policy``. A bad value gives 0. Policy validation reports it."""
+    evaluation = workload.get("evaluation")
+    policy = evaluation.get("sample_policy") if isinstance(evaluation, dict) else None
+    value = policy.get("warmup_iterations", 0) if isinstance(policy, dict) else 0
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= MAX_WARMUP_ITERATIONS:
+        return 0
+    return value
+
+
 def detect_efficiency_commands(
     repo_path: Path,
     manifest: dict[str, Any],
@@ -187,6 +200,7 @@ def detect_efficiency_commands(
                     "cwd_subpath": cwd_subpath,
                     "regression_threshold_pct": float(workload.get("regression_threshold_pct", 10.0)),
                     "improvement_threshold_pct": float(workload.get("improvement_threshold_pct", 10.0)),
+                    "warmup_iterations": _warmup_iterations(workload),
                     "manifest_path": manifest.get("manifest_path"),
                     "manifest_sha256": manifest.get("manifest_sha256"),
                 },

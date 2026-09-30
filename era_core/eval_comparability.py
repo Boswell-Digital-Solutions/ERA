@@ -24,7 +24,15 @@ DEFAULT_REQUIRED_DIMENSIONS = (
 
 _TOP_LEVEL_DIMENSIONS = frozenset({"repo_id", "workload_id", "subject_kind", "source.commit_sha"})
 _EXECUTION_DIMENSIONS = frozenset(
-    {"hardware_fingerprint", "os_runtime_version", "concurrency", "batch_size", "network_mode", "resource_policy_id"}
+    {
+        "hardware_fingerprint",
+        "os_runtime_version",
+        "concurrency",
+        "batch_size",
+        "network_mode",
+        "resource_policy_id",
+        "energy_scope",
+    }
 )
 # ``subject.*`` and ``runtime.*`` keys are free-form because they depend on the subject kind.
 _FREE_FORM_PREFIXES = ("subject.", "runtime.")

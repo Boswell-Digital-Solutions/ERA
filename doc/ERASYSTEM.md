@@ -132,6 +132,18 @@ A workload with telemetry must also match on `execution.hardware_fingerprint`, `
 
 The vector records the telemetry file hash in `raw_evidence_refs` and the tool's scope in `measurement_scope`.
 
+## Sample Policy, Uncertainty, and Energy (WP08)
+
+A workload can set `evaluation.sample_policy`:
+
+- `warmup_iterations` (0 to 20): the runner executes these runs and discards their output and timing. The review states how many were discarded.
+- `min_samples`: a claim needs at least this many samples of the primary metric on both sides. Fewer samples give `no_claim_unstable`.
+- `require_ci_separation`: an `improvement` or `regression` needs 95 percent intervals that do not overlap. Overlapping intervals, or a missing interval, give `no_claim_unstable`.
+
+`era_core/eval_stats.py` computes a percentile bootstrap interval for each median (1000 resamples, 95 percent). The seed comes from the sample values, so the same samples always give the same interval. It needs 5 samples. With fewer, the vector records why the interval is omitted. Timing samples use whole milliseconds, so a very fast command has a coarse interval.
+
+Energy metrics are `energy_joules`, `energy_per_token_j`, and `tasks_per_joule`. The manifest must declare `telemetry_policy.energy_scope`: `gpu_counter_only`, `cpu_package`, or `system_wall`. The telemetry file must report the same scope. A missing or different scope leaves the energy metrics out and the review names the problem. Every energy metric carries its scope, and the review prints the scope label. `gpu_counter_only` and `cpu_package` are labelled "Not wall power". A comparison must match on `execution.energy_scope`, so a GPU counter is never compared with a wall meter.
+
 ---
 
             # Runtime Boundary

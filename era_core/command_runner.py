@@ -70,7 +70,10 @@ def run_planned_commands(
         # recorded command stays the real command; only execution is wrapped.
         exec_argv = sandbox.wrap(planned.command, planned.cwd) if sandbox else planned.command
 
-        for iteration_index in range(iterations_requested):
+        # Warmup runs execute the command but their output and timing are discarded.
+        warmup_iterations = max(0, int(lane_metadata.get("warmup_iterations") or 0))
+        for iteration_index in range(warmup_iterations + iterations_requested):
+            is_warmup = iteration_index < warmup_iterations
             timer_started = time.monotonic()
             try:
                 completed = subprocess.run(
@@ -80,20 +83,23 @@ def run_planned_commands(
                     timeout=timeout_seconds,
                     check=False,
                 )
-                stdout_chunks.append(completed.stdout)
-                stderr_chunks.append(completed.stderr)
+                if not is_warmup:
+                    stdout_chunks.append(completed.stdout)
+                    stderr_chunks.append(completed.stderr)
                 exit_code = completed.returncode
                 status = "passed" if completed.returncode in planned.success_exit_codes else "failed"
             except subprocess.TimeoutExpired as exc:
-                stdout_chunks.append(exc.stdout or b"")
-                stderr_chunks.append(exc.stderr or b"")
+                if not is_warmup:
+                    stdout_chunks.append(exc.stdout or b"")
+                    stderr_chunks.append(exc.stderr or b"")
                 status = "timed_out"
                 blocked_reason = f"Command timed out after {timeout_seconds}s."
             except OSError as exc:
                 status = "failed_to_execute"
                 blocked_reason = str(exc)
 
-            iteration_durations_ms.append(int((time.monotonic() - timer_started) * 1000))
+            if not is_warmup:
+                iteration_durations_ms.append(int((time.monotonic() - timer_started) * 1000))
             if status != "passed":
                 break
 
@@ -142,6 +148,8 @@ def run_planned_commands(
             stdout_sha = sha256_bytes(stdout_payload)
             stderr_sha = sha256_bytes(stderr_payload)
 
+        if warmup_iterations:
+            lane_metadata["warmup_iterations"] = warmup_iterations
         lane_metadata["iterations_requested"] = iterations_requested
         lane_metadata["iterations_completed"] = len(iteration_durations_ms)
         lane_metadata["iteration_durations_ms"] = iteration_durations_ms

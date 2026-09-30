@@ -169,6 +169,7 @@ def decide_claim(
     primary_metric: str = PRIMARY_METRIC,
     min_samples: int = 0,
     require_ci_separation: bool = False,
+    isolation_status: str = "not_required",
 ) -> dict[str, Any]:
     """Return the status fields of a ``QualityEfficiencyComparison.v1``.
 
@@ -187,6 +188,7 @@ def decide_claim(
         "metric_deltas": {},
         "blocked_reasons": [],
         "primary_metric": primary_metric,
+        "isolation_status": isolation_status,
     }
 
     def block(claim: str, reasons: list[str]) -> dict[str, Any]:
@@ -201,6 +203,12 @@ def decide_claim(
         return block("quality_blocked", gate["failure_reasons"])
     if quality_status == "unproven":
         return block("quality_unproven", gate["failure_reasons"])
+    if isolation_status == "unsatisfied":
+        # Quality outcomes above stay visible. Any other claim needs a contained run.
+        return block(
+            "evidence_blocked",
+            ["Isolation is required for this workload, but the run was not contained. No claim can be made."],
+        )
     if vector is None:
         return block("evidence_blocked", ["No metric vector exists for the candidate."])
 
@@ -361,4 +369,5 @@ def build_comparison_artifact(
             for item in selection["rejected"]
         ],
         primary_metric=decision.get("primary_metric", PRIMARY_METRIC),
+        isolation_status=decision.get("isolation_status", "not_required"),
     )

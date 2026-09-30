@@ -8,7 +8,7 @@ from typing import Any
 
 from era_core.eval_telemetry import ENERGY_SCOPES
 
-EVAL_KINDS = ("fingerprint", "quality_gate", "metric_vector", "judge_audit", "comparison")
+EVAL_KINDS = ("fingerprint", "quality_gate", "metric_vector", "judge_audit", "isolation_receipt", "comparison")
 
 
 def load_eval_artifacts(run_root: Path, refs: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -30,6 +30,22 @@ def load_eval_artifacts(run_root: Path, refs: dict[str, Any]) -> dict[str, dict[
 
 def eval_hash_values(refs: dict[str, Any]) -> list[str]:
     return [entry[kind]["sha256"] for entry in (refs or {}).values() for kind in EVAL_KINDS if entry.get(kind)]
+
+
+def _isolation_lines(receipt: dict[str, Any]) -> list[str]:
+    posture = receipt.get("posture") or {}
+    lines = [
+        f"- isolation: `{receipt['status']}` (provider `{receipt.get('provider')}`)",
+        f"  - sandbox `{_fmt(posture.get('sandbox'))}`, network `{_fmt(posture.get('network'))}`,"
+        f" target filesystem `{_fmt(posture.get('target_filesystem'))}`, trust `{_fmt(posture.get('target_trust'))}`",
+    ]
+    if receipt.get("isolation_required"):
+        lines.append(f"  - required because: {', '.join(receipt.get('required_reasons', []))}")
+    if receipt["status"] == "unsatisfied":
+        lines.append("  - no claim is made: the run was not contained")
+    for limitation in receipt.get("limitations", []):
+        lines.append(f"  - limitation: {limitation}")
+    return lines
 
 
 def _judge_lines(audit: dict[str, Any]) -> list[str]:
@@ -85,6 +101,9 @@ def render_eval_section(refs: dict[str, Any], artifacts: dict[str, dict[str, Any
         lines.append(f"- quality gate status: `{_fmt((gate or {}).get('gate_status') or entry.get('quality_status'))}`")
         for reason in (gate or {}).get("failure_reasons", []) or []:
             lines.append(f"  - quality reason: {reason}")
+        receipt = found.get("isolation_receipt")
+        if receipt is not None:
+            lines.extend(_isolation_lines(receipt))
         audit = found.get("judge_audit")
         if audit is not None:
             lines.extend(_judge_lines(audit))

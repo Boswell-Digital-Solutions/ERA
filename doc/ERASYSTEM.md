@@ -180,6 +180,18 @@ The success rate has a Wilson interval. The other medians have a bootstrap inter
 
 An agent that is cheaper because it fails gets `quality_blocked`. Quality is checked before efficiency. ERA reports each metric on its own row and computes no promotion score.
 
+## Isolation Receipt (WP11)
+
+Operator ruling 2 names `era_core/sandbox.py` as the authorized isolation provider. Each opted-in workload gets an `IsolationReceipt.v1` next to its fingerprint. The receipt records the sandbox, backend, network, and target filesystem that the run had, plus the trust attestation and the read-only scope. It states the limits of a contained run: it is not a full jail, and ERA does not certify that a workload is safe.
+
+A workload requires isolation when its `subject_kind` is `agent` or its `evaluation.workload_traits` lists `agentic`, `mcp_tools`, `generated_code`, `external_repo`, or `untrusted`. No manifest field turns a required run off. A required run is `satisfied` only when the sandbox is `contained`, the network is `isolated`, and the target filesystem is `overlay_protected`. Otherwise it is `unsatisfied`.
+
+An `unsatisfied` receipt blocks every claim except a quality outcome. The claim is `evidence_blocked` with the reason named, and the review says no claim was made. A trusted-target run without containment cannot make a promotion-capable claim for an agent.
+
+Validation checks that the receipt matches the fingerprint's execution identity, that its requirement matches the manifest, that its status follows from its posture, and that the comparison records the same status.
+
+Every comparison for an opted-in workload must now match on `execution.sandbox`, `execution.network`, and `execution.target_filesystem`. A contained run and an uncontained run never compare as equal (operator ruling 3).
+
 ---
 
             # Runtime Boundary

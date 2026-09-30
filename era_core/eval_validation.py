@@ -22,6 +22,7 @@ from era_core.eval_contracts import (
     validate_quality_efficiency_comparison,
     validate_quality_gate_artifact,
 )
+from era_core.eval_isolation import POSTURE_KEYS, isolation_requirement, validate_isolation_receipt
 from era_core.eval_judge import validate_judge_audit
 from era_core.eval_lane import eval_policy, required_dimensions, workload_dirname
 from era_core.eval_review import EVAL_KINDS
@@ -32,6 +33,7 @@ _VALIDATORS = {
     "quality_gate": validate_quality_gate_artifact,
     "metric_vector": validate_metric_vector,
     "judge_audit": validate_judge_audit,
+    "isolation_receipt": validate_isolation_receipt,
     "comparison": validate_quality_efficiency_comparison,
 }
 
@@ -119,6 +121,10 @@ def validate_eval_evidence(
         errors.extend(_check_completeness(label, entry, loaded, judge_required=bool(judge_policy)))
         errors.extend(f"{label}: {item}" for item in _check_linkage(loaded))
         errors.extend(f"{label}: {item}" for item in _check_judge(loaded, judge_policy))
+        errors.extend(
+            f"{label}: {item}"
+            for item in _check_isolation(loaded, eval_policy(v2_workloads.get(workload_id, {})) or {})
+        )
         comparison = loaded.get("comparison")
         if comparison is not None:
             errors.extend(
@@ -135,6 +141,28 @@ def validate_eval_evidence(
     for key in chain_entries:
         if key not in expected_keys:
             errors.append(f"Evidence hash chain references missing evaluation artifact {key[1]} for {key[0]}.")
+    return errors
+
+
+def _check_isolation(loaded: dict[str, dict[str, Any]], policy: dict[str, Any]) -> list[str]:
+    """The receipt must match the fingerprint, the manifest, and the comparison."""
+    receipt, fingerprint, comparison = loaded.get("isolation_receipt"), loaded.get("fingerprint"), loaded.get("comparison")
+    if receipt is None or fingerprint is None:
+        return []
+    errors: list[str] = []
+    if receipt.get("config_fingerprint_id") != fingerprint.get("fingerprint_id"):
+        errors.append("isolation receipt references a different config fingerprint id.")
+    if receipt.get("config_fingerprint_sha256") != fingerprint.get("sha256"):
+        errors.append("isolation receipt references a different config fingerprint digest.")
+    identity = fingerprint.get("execution_identity") or {}
+    for key in POSTURE_KEYS:
+        if (receipt.get("posture") or {}).get(key) != identity.get(key):
+            errors.append(f"isolation receipt posture `{key}` differs from the fingerprint execution identity.")
+    required, _ = isolation_requirement(policy)
+    if receipt.get("isolation_required") != required:
+        errors.append("isolation receipt requirement differs from the manifest.")
+    if comparison is not None and comparison.get("isolation_status") != receipt.get("status"):
+        errors.append("comparison isolation_status does not match the isolation receipt.")
     return errors
 
 
@@ -173,6 +201,8 @@ def _check_completeness(
         for kind in ("fingerprint", "quality_gate"):
             if kind not in loaded:
                 errors.append(f"{label}: {kind} artifact is missing.")
+    if entry.get("quality_status") != "invalid" and "isolation_receipt" not in loaded:
+        errors.append(f"{label}: isolation_receipt artifact is missing.")
     if judge_required and entry.get("quality_status") != "invalid" and "judge_audit" not in loaded:
         errors.append(f"{label}: judge_audit artifact is missing.")
     if claim in {"permitted", "no_claim_unstable"} and "metric_vector" not in loaded:

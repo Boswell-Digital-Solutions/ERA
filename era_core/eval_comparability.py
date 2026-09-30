@@ -32,6 +32,10 @@ _EXECUTION_DIMENSIONS = frozenset(
         "network_mode",
         "resource_policy_id",
         "energy_scope",
+        "sandbox",
+        "sandbox_backend",
+        "network",
+        "target_filesystem",
     }
 )
 # ``subject.*`` and ``runtime.*`` keys are free-form because they depend on the subject kind.

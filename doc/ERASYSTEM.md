@@ -101,6 +101,23 @@ The checks run in this order, and the first one that fails sets the claim:
 
 The workload status in `baseline_artifact.json` follows the claim. A `regression` that is `permitted` still makes the existing efficiency finding. All other blocked claims are evidence only and make no finding.
 
+## Evidence Chain and Review (WP05)
+
+`hashes.json` lists every evaluation artifact in `evidence_hash_chain.evaluation_artifacts`. Each entry has the workload, the kind, the run-relative path, and the embedded hash.
+
+`era_core/eval_validation.py` runs inside `validate_run_dir`. It fails closed in each of these cases:
+
+- An artifact is missing, or a chain entry names an artifact that does not exist.
+- A hash differs from the bundle reference or the chain entry.
+- An artifact does not validate, or belongs to another run or workload.
+- The quality gate or the metric vector references another fingerprint.
+- The comparison disagrees with its fingerprint, its quality gate, or `baseline_artifact.json`.
+- The recorded baseline run is missing, no longer validates, did not pass quality, or is no longer comparable.
+
+An attacker can refresh the file entries in `hashes.json`. The reference and linkage checks still catch an edited artifact.
+
+`review.md` has a "Quality-Gated Evaluation" section for each opted-in workload. It shows the claim status, the quality status and reasons, the candidate fingerprint, the baseline run and fingerprint, the comparability and blocked reasons, the stability, each metric delta on its own row, the rejected baselines, and the artifact hashes. The word `improvement` appears only for a permitted claim.
+
 ---
 
             # Runtime Boundary

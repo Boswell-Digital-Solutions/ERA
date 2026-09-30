@@ -222,6 +222,12 @@ def decide_claim(
         return block("evidence_blocked", [f"Direction `{direction}` cannot support a claim."])
 
     result["metric_deltas"] = {PRIMARY_METRIC: _metric_delta(candidate_metric, baseline_metric)}
+    result["metric_deltas"][PRIMARY_METRIC]["candidate_stability"] = vector["variance_or_uncertainty"].get(
+        "variance_classification"
+    )
+    result["metric_deltas"][PRIMARY_METRIC]["baseline_stability"] = baseline_vector["variance_or_uncertainty"].get(
+        "variance_classification"
+    )
     unstable = [
         label
         for label, source in (("candidate", vector), ("baseline", baseline_vector))

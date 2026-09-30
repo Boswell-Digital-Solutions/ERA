@@ -261,7 +261,7 @@ def _write_eval_evidence(
             if artifacts[key] is not None:
                 path = directory / f"{key}.json"
                 write_json(path, artifacts[key])
-                entry[key] = {"path": str(path.relative_to(efficiency_dir.parent)), "sha256": artifacts[key]["sha256"]}
+                entry[key] = {"path": str(path.relative_to(efficiency_dir.parent.parent)), "sha256": artifacts[key]["sha256"]}
         refs[workload_id] = entry
     return refs
 

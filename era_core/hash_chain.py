@@ -93,7 +93,15 @@ def build_evidence_hash_chain(
         for score in findings_bundle.get("era_scores", [])
     ]
 
-    return {
+    evaluation_artifacts = [
+        {"workload_id": workload_id, "kind": kind, "path": entry[kind]["path"], "sha256": entry[kind]["sha256"]}
+        for workload_id, entry in sorted(
+            ((evidence_bundles.get("efficiency") or {}).get("evaluation_evidence_refs") or {}).items()
+        )
+        for kind in ("fingerprint", "quality_gate", "metric_vector", "comparison")
+        if entry.get(kind)
+    ]
+    chain = {
         "schema_version": "ERAEvidenceHashChain.v1",
         "run_id": run_id,
         "raw_artifacts": raw_artifacts,
@@ -111,6 +119,9 @@ def build_evidence_hash_chain(
         },
         "created_at": utc_now_text(),
     }
+    if evaluation_artifacts:
+        chain["evaluation_artifacts"] = evaluation_artifacts
+    return chain
 
 
 def build_hash_manifest(

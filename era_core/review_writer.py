@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from era_core.eval_review import load_eval_artifacts, render_eval_section
 from era_core.models import CommandResult
 
 
@@ -69,6 +70,14 @@ def determine_efficiency_classification(
     if not any(item.get("comparison_status") in {"within_range", "improvement", "regression"} for item in comparisons):
         return "unproven"
     return "within_expected_range"
+
+
+def _workload_status_text(comparison: dict[str, Any]) -> str:
+    """Status text for the workload table. A gated workload always shows its gates."""
+    status = str(comparison.get("comparison_status", "n/a"))
+    if comparison.get("evaluation"):
+        return f"{status} (claim {comparison.get('claim_status', 'n/a')}, quality {comparison.get('quality_status', 'n/a')})"
+    return status
 
 
 def _fmt_path(path_value: str | None) -> str:
@@ -259,6 +268,8 @@ def write_review(
             ]
         )
         comparison_by_workload = {item["workload_id"]: item for item in comparisons}
+        eval_refs = evidence_bundles["efficiency"].get("evaluation_evidence_refs") or {}
+        eval_artifacts = load_eval_artifacts(Path(str(run_artifact["artifact_root"])), eval_refs)
         for result in command_results:
             metadata = result.lane_metadata or {}
             workload_id = metadata.get("workload_id", result.command_id)
@@ -273,7 +284,7 @@ def write_review(
                         str(metadata.get("iterations_completed", 0)),
                         str(timing_summary.get("median_ms", "n/a")),
                         str(metadata.get("variance_classification", "n/a")),
-                        str(comparison.get("comparison_status", "n/a")),
+                        _workload_status_text(comparison),
                         str(comparison.get("delta_pct", "n/a")),
                     ]
                 )
@@ -281,6 +292,8 @@ def write_review(
             )
         if not command_results:
             lines.append("| none | n/a | 0 | n/a | n/a | n/a | n/a |")
+
+        lines.extend(render_eval_section(eval_refs, eval_artifacts))
 
         lines.extend(["", "### Candidate Findings"])
         if efficiency_findings:

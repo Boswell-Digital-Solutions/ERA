@@ -36,3 +36,27 @@ Findings for this repo. Each entry has a date, the problem, the root cause, the 
 
 **Open.** DataForge Local drop-directory intake, and a separate Forge_Command read-only route. Each is its own bounded plan and PR. The envelope `signature` is an unsigned digest reference: ERA holds no signing key. A consumer must not read it as a signature.
 
+
+## 2026-09-30 — KI-ERA-20260930-001: Documentation builder ignores --check and rewrites the compiled reference
+
+**Status: OPEN — confirmed by source inspection; repair not applied.**
+
+**Source lock.** `Boswell-Digital-Solutions/ERA@2d8b1746583bb1db4fe7c1bf400613e51d2ec700` (`master`, rechecked 2026-09-30).
+
+**Evidence.** Complete reads of `doc/system/BUILD.sh` and `doc/system/validate_snapshots.sh`. The builder does not parse positional arguments. After temporary assembly and marker validation, it unconditionally executes `cp "$TMP_OUTPUT" "$ROOT_DIR/$OUTPUT"` and `chmod 664 "$ROOT_DIR/$OUTPUT"`, then reports `BUILD_OK`. The validator checks required documentation markers, not equality with the committed reference.
+
+**Problem and impact.** `bash doc/system/BUILD.sh --check` follows the normal write path instead of a non-mutating parity check. With valid source structure and markers, a stale `doc/ERASYSTEM.md` can be overwritten rather than rejected. A successful invocation is therefore not evidence that the committed reference was already current. This is a missing verification mode; the inspected ERA chapters document assembly and do not make QRE's explicit `BUILD_STALE` promise.
+
+**Root cause.** Argument dispatch and a comparison against the existing output are absent. Structural marker validation is being performed, but it is not documentation parity validation.
+
+**Verification limits.** No script or test suite was executed for this finding. Current compiled-document staleness, the existence of an active CI caller passing `--check`, and the state of any runtime deployment were not established. This entry records observable script behavior, not a demonstrated CI failure or stale artifact.
+
+**Bounded repair proposal — not authorization.** Add explicit build/check argument handling. Preserve intentional normal assembly. In check mode, assemble and validate in temporary storage, compare against the existing committed output without creating or modifying repository files, return nonzero for stale or missing output, and reject unsupported arguments before side effects. Do not hand-edit the compiled reference or alter ERA runtime/evaluation behavior.
+
+**Closure evidence required.** Regression tests must prove: a current reference passes without byte or mode changes; stale and missing references fail without repair or creation; invalid source/validation failures leave the output unchanged; unsupported arguments fail without writes; and explicit normal build still regenerates the reference. Run these in an isolated test checkout and record the exact repair head and results, including repository state before and after check mode.
+
+**Related findings.** `failureforge: KI-FFG-20260930-001`; `bds-QRE: KI-QRE-20260930-001`. Each repository needs its own repair and evidence. Fixing one does not close the others.
+
+**Review qualification.** `doc/system/06-verification.md` describes GATE-06 as seven local-sleep scenarios with no model, provider, agent, or network calls. That proving run establishes bounded claim-processing/reconstruction behavior, not live-model or live-agent evaluation coverage. This is a verification limit, not an additional confirmed implementation defect; no live campaign is authorized by this entry.
+
+**Authority and scope.** Operator requested known-issues documentation on 2026-09-30. This entry changes no script, generated reference, runtime, contract, baseline, CI enforcement, or existing issue disposition. Repair and closure remain separate work.

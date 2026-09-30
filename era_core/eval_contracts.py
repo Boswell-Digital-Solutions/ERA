@@ -8,6 +8,7 @@ Every validator returns a list of error strings. An empty list means valid.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from era_core.artifact_paths import utc_now_text
@@ -55,6 +56,15 @@ EVALUATION_IDENTITY_FIELDS = (
 # Identity groups that feed the comparison digest. run_id, created_at, and the
 # commit SHA stay outside it so that two runs of one configuration share a digest.
 _CONFIG_GROUPS = ("subject_identity", "runtime_identity", "evaluation_identity", "execution_identity")
+
+
+def precise_now_text() -> str:
+    """UTC time with microseconds. Baseline selection orders by this value.
+
+    ``utc_now_text`` has one-second resolution. Two runs in one second would tie,
+    and the random run-ID suffix would pick the "latest" one at random.
+    """
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _seal(payload: dict[str, Any]) -> dict[str, Any]:
@@ -156,7 +166,7 @@ def build_config_fingerprint(
             "evaluation_identity": evaluation_identity,
             "execution_identity": execution_identity,
             "config_digest": config_digest,
-            "created_at": created_at or utc_now_text(),
+            "created_at": created_at or precise_now_text(),
         }
     )
 

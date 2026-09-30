@@ -1,0 +1,366 @@
+{
+  "created_at": "2026-09-30T07:23:06Z",
+  "gate": "GATE-06",
+  "gate_06_pass": true,
+  "live_dependencies": {
+    "agent_runs": 0,
+    "model_calls": 0,
+    "network": "not used",
+    "provider_calls": 0
+  },
+  "plan_id": "BDS-ERA-EVAL-v0.1",
+  "scenarios": [
+    {
+      "actual": {
+        "claim": "no_baseline",
+        "efficiency": "not_evaluated",
+        "findings": 0,
+        "lane": "unproven"
+      },
+      "baseline_rejections": [],
+      "baseline_run_id": null,
+      "blocked_reasons": [
+        "No prior run has evaluation evidence for this workload."
+      ],
+      "checks": {
+        "comparison_in_hash_chain": true,
+        "outcome_matches_expected": true,
+        "reconstruction_matches_stored": true,
+        "run_validates": true
+      },
+      "comparability_status": "unknown",
+      "comparison_sha256": "c2801316894d9c8dec882cdbd5d4cf741989d0b08e8f64b8cdfbe5c60986d519",
+      "execution_posture": {
+        "network": "host",
+        "sandbox": "none",
+        "target_filesystem": "writable",
+        "target_trust": "operator_trusted"
+      },
+      "expected": {
+        "claim": "no_baseline",
+        "efficiency": "not_evaluated",
+        "findings": 0,
+        "lane": "unproven"
+      },
+      "passed": true,
+      "quality_status": "passed",
+      "reconstruction_differences": [],
+      "run_id": "20260930T072302Z-83d39c0c",
+      "scenario": "baseline",
+      "validation_errors": []
+    },
+    {
+      "actual": {
+        "claim": "permitted",
+        "efficiency": "improvement",
+        "findings": 0,
+        "lane": "within_expected_range"
+      },
+      "baseline_rejections": [],
+      "baseline_run_id": "20260930T072302Z-83d39c0c",
+      "blocked_reasons": [],
+      "checks": {
+        "comparison_in_hash_chain": true,
+        "outcome_matches_expected": true,
+        "reconstruction_matches_stored": true,
+        "run_validates": true
+      },
+      "comparability_status": "comparable",
+      "comparison_sha256": "13784842e1e3849422a7f0f78ca34d822ef30f54c57914af0552062247744756",
+      "execution_posture": {
+        "network": "host",
+        "sandbox": "none",
+        "target_filesystem": "writable",
+        "target_trust": "operator_trusted"
+      },
+      "expected": {
+        "claim": "permitted",
+        "efficiency": "improvement",
+        "findings": 0,
+        "lane": "within_expected_range"
+      },
+      "passed": true,
+      "quality_status": "passed",
+      "reconstruction_differences": [],
+      "run_id": "20260930T072303Z-a5ae623b",
+      "scenario": "allowed_improvement",
+      "validation_errors": []
+    },
+    {
+      "actual": {
+        "claim": "permitted",
+        "efficiency": "regression",
+        "findings": 1,
+        "lane": "regression_with_baseline"
+      },
+      "baseline_rejections": [],
+      "baseline_run_id": "20260930T072303Z-a5ae623b",
+      "blocked_reasons": [],
+      "checks": {
+        "comparison_in_hash_chain": true,
+        "outcome_matches_expected": true,
+        "reconstruction_matches_stored": true,
+        "run_validates": true
+      },
+      "comparability_status": "comparable",
+      "comparison_sha256": "243ee32bc22cd62f5dc3911aee32397c0c53f3ad851457599272bea9fe64a12d",
+      "execution_posture": {
+        "network": "host",
+        "sandbox": "none",
+        "target_filesystem": "writable",
+        "target_trust": "operator_trusted"
+      },
+      "expected": {
+        "claim": "permitted",
+        "efficiency": "regression",
+        "findings": 1,
+        "lane": "regression_with_baseline"
+      },
+      "passed": true,
+      "quality_status": "passed",
+      "reconstruction_differences": [],
+      "run_id": "20260930T072303Z-63253507",
+      "scenario": "allowed_regression",
+      "validation_errors": []
+    },
+    {
+      "actual": {
+        "claim": "quality_blocked",
+        "efficiency": "not_evaluated",
+        "findings": 0,
+        "lane": "quality_blocked"
+      },
+      "baseline_rejections": [],
+      "baseline_run_id": "20260930T072303Z-63253507",
+      "blocked_reasons": [
+        "`accuracy` 0.4 is below the minimum 0.9."
+      ],
+      "checks": {
+        "comparison_in_hash_chain": true,
+        "outcome_matches_expected": true,
+        "reconstruction_matches_stored": true,
+        "run_validates": true
+      },
+      "comparability_status": "unknown",
+      "comparison_sha256": "85b64a6d36020fbfa09135e7db99ea46ade912ddbef22d762fb6a70c268c770f",
+      "execution_posture": {
+        "network": "host",
+        "sandbox": "none",
+        "target_filesystem": "writable",
+        "target_trust": "operator_trusted"
+      },
+      "expected": {
+        "claim": "quality_blocked",
+        "efficiency": "not_evaluated",
+        "findings": 0,
+        "lane": "quality_blocked"
+      },
+      "passed": true,
+      "quality_status": "failed",
+      "reconstruction_differences": [],
+      "run_id": "20260930T072305Z-b983450d",
+      "scenario": "quality_blocked_faster_candidate",
+      "validation_errors": []
+    },
+    {
+      "actual": {
+        "claim": "quality_unproven",
+        "efficiency": "not_evaluated",
+        "findings": 0,
+        "lane": "quality_unproven"
+      },
+      "baseline_rejections": [
+        {
+          "blocked_reasons": [
+            "Prior quality gate is `failed`, so it is not a fair baseline."
+          ],
+          "comparability_status": "comparable",
+          "reason": "quality_failed",
+          "run_id": "20260930T072305Z-b983450d"
+        }
+      ],
+      "baseline_run_id": "20260930T072303Z-63253507",
+      "blocked_reasons": [
+        "Quality results file `quality/results.json` does not exist.",
+        "No quality floors declared or no samples measured."
+      ],
+      "checks": {
+        "comparison_in_hash_chain": true,
+        "outcome_matches_expected": true,
+        "reconstruction_matches_stored": true,
+        "run_validates": true
+      },
+      "comparability_status": "unknown",
+      "comparison_sha256": "13fc6a668f6b3f239e10d96908ac2c1f53769710af4c1c6ca580a33d25496a8c",
+      "execution_posture": {
+        "network": "host",
+        "sandbox": "none",
+        "target_filesystem": "writable",
+        "target_trust": "operator_trusted"
+      },
+      "expected": {
+        "claim": "quality_unproven",
+        "efficiency": "not_evaluated",
+        "findings": 0,
+        "lane": "quality_unproven"
+      },
+      "passed": true,
+      "quality_status": "unproven",
+      "reconstruction_differences": [],
+      "run_id": "20260930T072306Z-6d9c8cc1",
+      "scenario": "quality_unproven_candidate",
+      "validation_errors": []
+    },
+    {
+      "actual": {
+        "claim": "incomparable",
+        "efficiency": "not_evaluated",
+        "findings": 0,
+        "lane": "incomparable"
+      },
+      "baseline_rejections": [
+        {
+          "blocked_reasons": [
+            "`evaluation.dataset_or_fixture_hash` differs: candidate 'proving-data-2', baseline 'proving-data-1'."
+          ],
+          "comparability_status": "incomparable",
+          "reason": "fingerprint_incomparable",
+          "run_id": "20260930T072302Z-83d39c0c"
+        },
+        {
+          "blocked_reasons": [
+            "`evaluation.dataset_or_fixture_hash` differs: candidate 'proving-data-2', baseline 'proving-data-1'."
+          ],
+          "comparability_status": "incomparable",
+          "reason": "fingerprint_incomparable",
+          "run_id": "20260930T072303Z-63253507"
+        },
+        {
+          "blocked_reasons": [
+            "`evaluation.dataset_or_fixture_hash` differs: candidate 'proving-data-2', baseline 'proving-data-1'."
+          ],
+          "comparability_status": "incomparable",
+          "reason": "fingerprint_incomparable",
+          "run_id": "20260930T072303Z-a5ae623b"
+        },
+        {
+          "blocked_reasons": [
+            "`evaluation.dataset_or_fixture_hash` differs: candidate 'proving-data-2', baseline 'proving-data-1'."
+          ],
+          "comparability_status": "incomparable",
+          "reason": "fingerprint_incomparable",
+          "run_id": "20260930T072305Z-b983450d"
+        },
+        {
+          "blocked_reasons": [
+            "`evaluation.dataset_or_fixture_hash` differs: candidate 'proving-data-2', baseline 'proving-data-1'."
+          ],
+          "comparability_status": "incomparable",
+          "reason": "fingerprint_incomparable",
+          "run_id": "20260930T072306Z-6d9c8cc1"
+        }
+      ],
+      "baseline_run_id": null,
+      "blocked_reasons": [
+        "`evaluation.dataset_or_fixture_hash` differs: candidate 'proving-data-2', baseline 'proving-data-1'.",
+        "`evaluation.dataset_or_fixture_hash` differs: candidate 'proving-data-2', baseline 'proving-data-1'.",
+        "`evaluation.dataset_or_fixture_hash` differs: candidate 'proving-data-2', baseline 'proving-data-1'.",
+        "`evaluation.dataset_or_fixture_hash` differs: candidate 'proving-data-2', baseline 'proving-data-1'.",
+        "`evaluation.dataset_or_fixture_hash` differs: candidate 'proving-data-2', baseline 'proving-data-1'."
+      ],
+      "checks": {
+        "comparison_in_hash_chain": true,
+        "outcome_matches_expected": true,
+        "reconstruction_matches_stored": true,
+        "run_validates": true
+      },
+      "comparability_status": "incomparable",
+      "comparison_sha256": "24d3f6470815818219a8686d6dad34759aa540241582cc9d3269c498f4647afa",
+      "execution_posture": {
+        "network": "host",
+        "sandbox": "none",
+        "target_filesystem": "writable",
+        "target_trust": "operator_trusted"
+      },
+      "expected": {
+        "claim": "incomparable",
+        "efficiency": "not_evaluated",
+        "findings": 0,
+        "lane": "incomparable"
+      },
+      "passed": true,
+      "quality_status": "passed",
+      "reconstruction_differences": [],
+      "run_id": "20260930T072306Z-8678e8e2",
+      "scenario": "incomparable_config",
+      "validation_errors": []
+    },
+    {
+      "actual": {
+        "claim": "no_claim_unstable",
+        "efficiency": "unstable",
+        "findings": 0,
+        "lane": "unstable"
+      },
+      "baseline_rejections": [
+        {
+          "blocked_reasons": [
+            "Prior quality gate is `failed`, so it is not a fair baseline."
+          ],
+          "comparability_status": "comparable",
+          "reason": "quality_failed",
+          "run_id": "20260930T072305Z-b983450d"
+        },
+        {
+          "blocked_reasons": [
+            "Prior quality gate is `unproven`, so it is not a fair baseline."
+          ],
+          "comparability_status": "comparable",
+          "reason": "quality_unproven",
+          "run_id": "20260930T072306Z-6d9c8cc1"
+        },
+        {
+          "blocked_reasons": [
+            "`evaluation.dataset_or_fixture_hash` differs: candidate 'proving-data-1', baseline 'proving-data-2'."
+          ],
+          "comparability_status": "incomparable",
+          "reason": "fingerprint_incomparable",
+          "run_id": "20260930T072306Z-8678e8e2"
+        }
+      ],
+      "baseline_run_id": "20260930T072303Z-63253507",
+      "blocked_reasons": [
+        "The candidate timing is too unstable for a claim."
+      ],
+      "checks": {
+        "comparison_in_hash_chain": true,
+        "outcome_matches_expected": true,
+        "reconstruction_matches_stored": true,
+        "run_validates": true
+      },
+      "comparability_status": "comparable",
+      "comparison_sha256": "a65886387e865a0f29025da0bff0ae57336f9a8b2be56a99d8cfcc10f9d87ace",
+      "execution_posture": {
+        "network": "host",
+        "sandbox": "none",
+        "target_filesystem": "writable",
+        "target_trust": "operator_trusted"
+      },
+      "expected": {
+        "claim": "no_claim_unstable",
+        "efficiency": "unstable",
+        "findings": 0,
+        "lane": "unstable"
+      },
+      "passed": true,
+      "quality_status": "passed",
+      "reconstruction_differences": [],
+      "run_id": "20260930T072306Z-76e6a15d",
+      "scenario": "unstable_measurement",
+      "validation_errors": []
+    }
+  ],
+  "schema_version": "ERAEvalProvingReceipt.v1",
+  "sha256": "b0f468ebba98ed029062d50490bafbe576484de39008bc07026352e0b78c1399",
+  "workload_id": "proving_probe"
+}

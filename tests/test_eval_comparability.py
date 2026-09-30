@@ -135,3 +135,22 @@ class SelectBaselineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SameSecondOrderingTests(unittest.TestCase):
+    def test_latest_is_the_one_created_last_even_within_one_second(self) -> None:
+        from era_core.eval_contracts import build_config_fingerprint
+        from tests.fixtures.eval.factories import base_fingerprint_kwargs
+
+        def build(run_id: str) -> dict:
+            kwargs = base_fingerprint_kwargs()
+            kwargs.update(run_id=run_id)
+            kwargs.pop("created_at")
+            return build_config_fingerprint(**kwargs)
+
+        # Descending run IDs would win a run_id tie-break. Creation order must win.
+        first, second, third = build("run-z"), build("run-m"), build("run-a")
+        self.assertLess(first["created_at"], second["created_at"])
+        self.assertLess(second["created_at"], third["created_at"])
+        result = select_baseline(make_fingerprint(run_id="run-c"), [first, second, third])
+        self.assertEqual(result["baseline_run_id"], "run-a")

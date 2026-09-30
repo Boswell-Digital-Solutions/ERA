@@ -42,6 +42,7 @@ from era_core.git_info import (
 )
 from era_core.eval_export import EXPORT_FILENAME, build_evaluation_export
 from era_core.hash_chain import build_hash_manifest
+from era_integrations.inbox_publish import publish_export
 from era_core.hashing import sha256_json, write_json
 from era_core.models import CommandResult
 from era_core.redundancy import (
@@ -114,6 +115,15 @@ def register(parser: argparse.ArgumentParser) -> None:
             "Attest that the target repository and its build/test scripts are trusted. "
             "Lets ERA run unsandboxed. Without either a usable sandbox or this flag, ERA "
             "fails closed and runs nothing."
+        ),
+    )
+    parser.add_argument(
+        "--no-publish",
+        action="store_true",
+        help=(
+            "Do not copy the evaluation export into the DataForge Local inbox. By default ERA "
+            "publishes it when the inbox (DFL_ERA_DROP_DIR, default ~/.dataforge-local/era-inbox) "
+            "already exists and is safe. ERA never creates the inbox."
         ),
     )
     parser.add_argument(
@@ -768,4 +778,7 @@ def main(args: argparse.Namespace) -> int:
         print(f"ERA refused to run (fail-closed): {exc}", file=sys.stderr)
         return 2
     print(run_dir)
+    if not getattr(args, "no_publish", False):
+        # Automation up to the operator's decision: hand the evidence on. A skip never fails the run.
+        print(publish_export(run_dir).line(), file=sys.stderr)
     return 0

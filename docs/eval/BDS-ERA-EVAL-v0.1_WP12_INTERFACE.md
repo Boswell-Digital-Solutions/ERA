@@ -65,3 +65,8 @@ ERA still finds, measures, proves, and reports. The export gives no approval, pr
 4. Baseline chain: kept. ERA writes a sealed baseline snapshot into each run that names a baseline, and the export carries a `baseline` block.
 
 The shape in the field table above is the local v1 shape. The admitted shape is the shared envelope with the payload described in `doc/system/02-contract-surface.md` and in the contract's `doc/system/02-admitted-families.md`.
+
+## Update 2026-09-30: automation to the point of decision
+
+The operator restated the company Core Six. Principle 6 is automation up to the point where human judgment is required. So ERA publishes the export by itself (ERA-PUB-01), DataForge Local scans the inbox on a schedule (DFL-ERA-01b), and Forge_Command shows the evidence. The operator decides. See `DFL-ERA-INTAKE-v0.1` Amendment 1 in `dataforge-Local`.
+

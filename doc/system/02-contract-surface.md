@@ -165,3 +165,19 @@ When a comparison names a baseline run, the newer run stores `baseline_snapshot.
 Validation proves the baseline from the snapshot: its evidence validates, its quality gate passed, its fingerprint is comparable under the manifest dimensions, and the comparison's baseline value matches. The baseline run folder is not needed. If it still exists, it must match the snapshot, so an edited folder cannot pass beside a good snapshot. `reconstruct_claim(..., from_snapshot=True)` rebuilds the claim without any sibling run folder.
 
 A run made before this change has no snapshot and still needs its baseline folder.
+
+## Publishing to DataForge Local (ERA-PUB-01)
+
+Company Core Six, principle 6: automate up to the decision. After `era run`, ERA copies the run's `evaluation_export.json` into the inbox that DataForge Local scans. DataForge Local stores it, Forge_Command shows it, and the operator decides. Nothing here approves or acts.
+
+`era_integrations/inbox_publish.py` does the copy.
+
+- **Location.** `DFL_ERA_DROP_DIR`, default `~/.dataforge-local/era-inbox`. This is the shared convention with DataForge Local.
+- **ERA never creates the inbox** and never writes to DataForge Local itself. If the directory is missing, ERA skips and says so.
+- **Fail closed.** ERA skips a symlinked inbox, an inbox owned by another user, and a group- or world-writable inbox. The envelope `signature` is an unsigned digest reference, so the inbox permission is the producer check on the other side. ERA does not publish into a directory that would weaken it.
+- **How.** ERA writes a hidden temporary file (mode 0600), flushes it, and renames it to `era_evaluation_export.<run_id>.json`. DataForge Local ignores the temporary name. Publishing the same run again gives the same file.
+- **Size.** ERA skips an export over 256 KiB (DataForge Local's store limit) and reports it.
+- **A skip never fails the run.** The run's own evidence is complete without it. `era run` prints the outcome on stderr. Stdout is still the run path.
+- **Receipt.** `publish_receipt.json` in the run folder records the outcome. It is an operational receipt outside the evidence hash chain.
+- **Off switch.** `era run --no-publish`. Library callers of `execute_run` do not publish. Only the command does. The test session points the inbox at a path that does not exist.
+

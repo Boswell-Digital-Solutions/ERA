@@ -8,6 +8,7 @@ from pathlib import Path
 from era_core.artifact_paths import utc_now_text
 from era_core.hashing import sha256_bytes
 from era_core.models import CommandResult, PlannedCommand
+from era_core.sandbox import Sandbox
 
 
 def _write_bytes(path: Path, payload: bytes) -> str:
@@ -21,6 +22,7 @@ def run_planned_commands(
     commands_dirs: dict[str, Path],
     tool_versions: dict[str, str],
     timeout_seconds: int = 1800,
+    sandbox: Sandbox | None = None,
 ) -> list[CommandResult]:
     results: list[CommandResult] = []
     for planned in planned_commands:
@@ -63,11 +65,16 @@ def run_planned_commands(
         lane_metadata = dict(planned.lane_metadata or {})
         iterations_requested = max(1, planned.iterations)
 
+        # When a sandbox is active, run the target's own command contained
+        # (no external network; the target tree is overlay-protected). The
+        # recorded command stays the real command; only execution is wrapped.
+        exec_argv = sandbox.wrap(planned.command, planned.cwd) if sandbox else planned.command
+
         for iteration_index in range(iterations_requested):
             timer_started = time.monotonic()
             try:
                 completed = subprocess.run(
-                    planned.command,
+                    exec_argv,
                     cwd=planned.cwd,
                     capture_output=True,
                     timeout=timeout_seconds,

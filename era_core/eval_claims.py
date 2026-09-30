@@ -165,8 +165,13 @@ def decide_claim(
     selection: dict[str, Any],
     regression_threshold_pct: float,
     improvement_threshold_pct: float,
+    primary_metric: str = PRIMARY_METRIC,
 ) -> dict[str, Any]:
-    """Return the status fields of a ``QualityEfficiencyComparison.v1``."""
+    """Return the status fields of a ``QualityEfficiencyComparison.v1``.
+
+    The claim rests on ``primary_metric`` only. Every other metric that both vectors
+    carry gets its own delta and outcome. ERA never combines metrics into one score.
+    """
     fingerprint, gate, vector = candidate["fingerprint"], candidate["quality_gate"], candidate["metric_vector"]
     quality_status = candidate["quality_status"]
     baseline = selection["baseline"]
@@ -178,6 +183,7 @@ def decide_claim(
         "comparison_dimensions": (selection["comparison"] or {}).get("comparison_dimensions", {}),
         "metric_deltas": {},
         "blocked_reasons": [],
+        "primary_metric": primary_metric,
     }
 
     def block(claim: str, reasons: list[str]) -> dict[str, Any]:
@@ -211,43 +217,69 @@ def decide_claim(
 
     result["comparability_status"] = "comparable"
     baseline_vector = baseline["metric_vector"]
-    candidate_metric = vector["metrics"].get(PRIMARY_METRIC)
-    baseline_metric = baseline_vector["metrics"].get(PRIMARY_METRIC)
+    candidate_metric = vector["metrics"].get(primary_metric)
+    baseline_metric = baseline_vector["metrics"].get(primary_metric)
     if candidate_metric is None or baseline_metric is None:
-        return block("evidence_blocked", [f"Metric `{PRIMARY_METRIC}` is missing from a metric vector."])
+        reasons = [f"Metric `{primary_metric}` is missing from a metric vector."] + candidate.get("telemetry_problems", [])
+        return block("evidence_blocked", reasons)
     direction = candidate_metric["direction"]
     if direction != baseline_metric["direction"]:
         return block("evidence_blocked", ["Candidate and baseline declare different metric directions."])
     if direction not in {"lower_is_better", "higher_is_better"}:
         return block("evidence_blocked", [f"Direction `{direction}` cannot support a claim."])
 
-    result["metric_deltas"] = {PRIMARY_METRIC: _metric_delta(candidate_metric, baseline_metric)}
-    result["metric_deltas"][PRIMARY_METRIC]["candidate_stability"] = vector["variance_or_uncertainty"].get(
-        "variance_classification"
-    )
-    result["metric_deltas"][PRIMARY_METRIC]["baseline_stability"] = baseline_vector["variance_or_uncertainty"].get(
-        "variance_classification"
+    result["metric_deltas"] = _all_deltas(
+        vector, baseline_vector, regression_threshold_pct, improvement_threshold_pct
     )
     unstable = [
         label
         for label, source in (("candidate", vector), ("baseline", baseline_vector))
-        if source["variance_or_uncertainty"].get("variance_classification") in UNSTABLE_CLASSES
+        if _stability(source, primary_metric) in UNSTABLE_CLASSES
     ]
     if unstable:
         result["efficiency_status"] = "unstable"
-        return block("no_claim_unstable", [f"The {' and '.join(unstable)} timing is too unstable for a claim."])
+        return block("no_claim_unstable", [f"The {' and '.join(unstable)} `{primary_metric}` is too unstable for a claim."])
 
-    delta_pct = result["metric_deltas"][PRIMARY_METRIC]["delta_pct"]
-    worse_pct = delta_pct if direction == "lower_is_better" else -delta_pct
-    if worse_pct >= regression_threshold_pct:
-        status = "regression"
-    elif worse_pct <= -improvement_threshold_pct:
-        status = "improvement"
-    else:
-        status = "within_range"
-    result["efficiency_status"] = status
+    outcome = result["metric_deltas"][primary_metric]["outcome"]
+    result["efficiency_status"] = {"better": "improvement", "worse": "regression", "within_range": "within_range"}[outcome]
     result["claim_status"] = "permitted"
     return result
+
+
+def _stability(vector: dict[str, Any], metric: str) -> str | None:
+    uncertainty = vector["variance_or_uncertainty"]
+    return (uncertainty.get("per_metric") or {}).get(metric) or uncertainty.get("variance_classification")
+
+
+def _all_deltas(
+    vector: dict[str, Any],
+    baseline_vector: dict[str, Any],
+    regression_threshold_pct: float,
+    improvement_threshold_pct: float,
+) -> dict[str, Any]:
+    deltas: dict[str, Any] = {}
+    for name, candidate_metric in sorted(vector["metrics"].items()):
+        baseline_metric = baseline_vector["metrics"].get(name)
+        if baseline_metric is None:
+            continue
+        delta = _metric_delta(candidate_metric, baseline_metric)
+        delta["candidate_stability"] = _stability(vector, name)
+        delta["baseline_stability"] = _stability(baseline_vector, name)
+        direction = candidate_metric["direction"]
+        if direction != baseline_metric["direction"]:
+            delta["outcome"] = "direction_mismatch"
+        elif direction not in {"lower_is_better", "higher_is_better"}:
+            delta["outcome"] = "not_assessed"
+        else:
+            worse = delta["delta_pct"] if direction == "lower_is_better" else -delta["delta_pct"]
+            if worse >= regression_threshold_pct:
+                delta["outcome"] = "worse"
+            elif worse <= -improvement_threshold_pct:
+                delta["outcome"] = "better"
+            else:
+                delta["outcome"] = "within_range"
+        deltas[name] = delta
+    return deltas
 
 
 COMPARISON_STATUS_BY_CLAIM = {
@@ -288,4 +320,5 @@ def build_comparison_artifact(
             {key: item[key] for key in ("run_id", "reason", "comparability_status", "blocked_reasons")}
             for item in selection["rejected"]
         ],
+        primary_metric=decision.get("primary_metric", PRIMARY_METRIC),
     )

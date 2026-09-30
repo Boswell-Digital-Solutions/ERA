@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from era_core.eval_claims import decide_claim, load_prior_evidence, select_eligible_baseline
-from era_core.eval_lane import eval_policy, required_dimensions, workload_dirname
+from era_core.eval_lane import eval_policy, primary_metric, required_dimensions, workload_dirname
 
 COMPARED_FIELDS = (
     "quality_status",
@@ -75,6 +75,7 @@ def reconstruct_claim(run_dir: Path, workload_id: str) -> dict[str, Any]:
         selection=selection,
         regression_threshold_pct=float(workload.get("regression_threshold_pct", 10.0)),
         improvement_threshold_pct=float(workload.get("improvement_threshold_pct", 10.0)),
+        primary_metric=primary_metric(policy),
     ) | {"baseline_run_id": (selection["baseline"] or {}).get("run_id"),
          "baseline_fingerprint_id": ((selection["baseline"] or {}).get("fingerprint") or {}).get("fingerprint_id")}
 
@@ -90,8 +91,13 @@ def compare_to_stored(run_dir: Path, workload_id: str) -> dict[str, Any]:
         for field in COMPARED_FIELDS
         if stored.get(field) != rebuilt.get(field)
     ]
-    stored_delta = (stored.get("metric_deltas") or {}).get("median_ms", {}).get("delta_pct")
-    rebuilt_delta = (rebuilt.get("metric_deltas") or {}).get("median_ms", {}).get("delta_pct")
-    if stored_delta != rebuilt_delta:
-        differences.append(f"median_ms delta_pct: stored {stored_delta!r}, reconstructed {rebuilt_delta!r}")
+    if stored.get("primary_metric", "median_ms") != rebuilt.get("primary_metric"):
+        differences.append(
+            f"primary_metric: stored {stored.get('primary_metric')!r}, reconstructed {rebuilt.get('primary_metric')!r}"
+        )
+    for name in sorted(set(stored.get("metric_deltas") or {}) | set(rebuilt.get("metric_deltas") or {})):
+        stored_delta = ((stored.get("metric_deltas") or {}).get(name) or {}).get("delta_pct")
+        rebuilt_delta = ((rebuilt.get("metric_deltas") or {}).get(name) or {}).get("delta_pct")
+        if stored_delta != rebuilt_delta:
+            differences.append(f"{name} delta_pct: stored {stored_delta!r}, reconstructed {rebuilt_delta!r}")
     return {"match": not differences, "differences": differences, "reconstructed": rebuilt}

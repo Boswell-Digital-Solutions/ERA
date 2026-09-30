@@ -193,11 +193,15 @@ def _check_comparison(
     if baseline_run:
         errors.extend(_check_baseline_reference(run_dir, workload_id, workload, loaded, comparison))
     if claim == "permitted":
-        delta = (comparison.get("metric_deltas") or {}).get(PRIMARY_METRIC)
+        primary = comparison.get("primary_metric", PRIMARY_METRIC)
+        declared = (eval_policy(workload) or {}).get("primary_metric", PRIMARY_METRIC)
+        if primary != declared:
+            errors.append(f"comparison primary_metric `{primary}` differs from the manifest (`{declared}`).")
+        delta = (comparison.get("metric_deltas") or {}).get(primary)
         vector = loaded.get("metric_vector")
         if delta is None or vector is None:
             errors.append("permitted claim has no metric delta.")
-        elif delta.get("candidate") != vector["metrics"].get(PRIMARY_METRIC, {}).get("value"):
+        elif delta.get("candidate") != vector["metrics"].get(primary, {}).get("value"):
             errors.append("comparison candidate value does not match the metric vector.")
     return errors
 

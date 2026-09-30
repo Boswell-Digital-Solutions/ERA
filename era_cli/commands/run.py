@@ -255,7 +255,12 @@ def _write_eval_evidence(
     refs: dict[str, Any] = {}
     for workload_id, evidence in sorted(eval_evidence.items()):
         directory = efficiency_dir / "eval" / workload_dirname(workload_id)
-        entry: dict[str, Any] = {"quality_status": evidence["quality_status"], "problems": evidence["problems"]}
+        entry: dict[str, Any] = {
+            "quality_status": evidence["quality_status"],
+            "problems": evidence["problems"],
+            "telemetry_problems": evidence.get("telemetry_problems", []),
+            "telemetry_notes": evidence.get("telemetry_notes", []),
+        }
         artifacts = {**evidence, "comparison": eval_comparisons.get(workload_id)}
         for key in ("fingerprint", "quality_gate", "metric_vector", "comparison"):
             if artifacts[key] is not None:

@@ -36,7 +36,8 @@ EVALUATION = {
 
 
 def write_v2_manifest(
-    era_root: Path, repo_name: str, evaluation: dict | None = None, command: list[str] | None = None
+    era_root: Path, repo_name: str, evaluation: dict | None = None, command: list[str] | None = None,
+    threshold_pct: float = 500.0,
 ) -> None:
     manifests = era_root / "config" / "workload_manifests"
     manifests.mkdir(parents=True, exist_ok=True)
@@ -54,8 +55,8 @@ def write_v2_manifest(
                         "cwd_subpath": ".",
                         "runner": "internal_timer",
                         "iterations": 3,
-                        "regression_threshold_pct": 500.0,
-                        "improvement_threshold_pct": 500.0,
+                        "regression_threshold_pct": threshold_pct,
+                        "improvement_threshold_pct": threshold_pct,
                         "evaluation": evaluation if evaluation is not None else copy.deepcopy(EVALUATION),
                     }
                 ],

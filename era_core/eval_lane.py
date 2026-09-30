@@ -52,6 +52,11 @@ from era_core.eval_contracts import (
     validate_metric_vector,
     validate_quality_gate_artifact,
 )
+from era_core.eval_telemetry import (
+    read_telemetry,
+    summarize_telemetry,
+    validate_telemetry_policy,
+)
 from era_core.hashing import sha256_json, sha256_path
 from era_core.models import CommandResult
 
@@ -91,6 +96,14 @@ def validate_eval_policy(policy: dict[str, Any]) -> list[str]:
         for name, direction in metrics.items():
             if direction not in METRIC_DIRECTIONS:
                 errors.append(f"evaluation.metrics.{name} has an unsupported direction.")
+    primary = policy.get("primary_metric", "median_ms")
+    if isinstance(metrics, dict) and metrics:
+        if primary not in metrics:
+            errors.append(f"evaluation.primary_metric `{primary}` is not a declared metric.")
+        elif metrics[primary] not in {"lower_is_better", "higher_is_better"}:
+            errors.append("evaluation.primary_metric needs lower_is_better or higher_is_better.")
+    if "telemetry_policy" in policy:
+        errors.extend(validate_telemetry_policy(policy["telemetry_policy"]))
     for key in ("required_comparison_dimensions", "non_binding_dimensions"):
         for name in policy.get(key, []) or []:
             if not isinstance(name, str) or not is_known_dimension(name):
@@ -98,9 +111,26 @@ def validate_eval_policy(policy: dict[str, Any]) -> list[str]:
     return errors
 
 
+TELEMETRY_SENSITIVE_DIMENSIONS = (
+    "execution.hardware_fingerprint",
+    "execution.concurrency",
+    "execution.batch_size",
+)
+
+
 def required_dimensions(policy: dict[str, Any]) -> tuple[str, ...]:
+    """Default dimensions, the manifest's own, and, for telemetry, the hardware-bound ones.
+
+    Hardware, concurrency, and batch size change latency and throughput. A manifest
+    can waive one only through ``non_binding_dimensions``.
+    """
     declared = tuple(policy.get("required_comparison_dimensions") or ())
-    return tuple(dict.fromkeys(DEFAULT_REQUIRED_DIMENSIONS + declared))
+    telemetry = TELEMETRY_SENSITIVE_DIMENSIONS if "telemetry_policy" in policy else ()
+    return tuple(dict.fromkeys(DEFAULT_REQUIRED_DIMENSIONS + telemetry + declared))
+
+
+def primary_metric(policy: dict[str, Any]) -> str:
+    return policy.get("primary_metric", "median_ms")
 
 
 def _read_quality_results(
@@ -150,6 +180,8 @@ def build_workload_eval_evidence(
         "metric_vector": None,
         "quality_status": "invalid",
         "problems": problems,
+        "telemetry_problems": [],
+        "telemetry_notes": [],
     }
     if problems:
         return evidence
@@ -197,25 +229,47 @@ def build_workload_eval_evidence(
     evidence["quality_status"] = gate["gate_status"]
 
     summary = ((command_result.lane_metadata or {}).get("timing_summary") if command_result else None) or {}
-    if command_result is not None and command_result.status == "passed" and "median_ms" in summary:
-        directions = policy["metrics"]
-        if "median_ms" in directions:
+    directions = policy["metrics"]
+    if command_result is not None and command_result.status == "passed":
+        lane_metadata = command_result.lane_metadata or {}
+        metrics: dict[str, dict[str, Any]] = {}
+        per_metric_variance: dict[str, str] = {}
+        per_metric_samples: dict[str, int] = {}
+        refs = [f"{command_result.command_id}:stdout", f"{command_result.command_id}:stderr"]
+        scopes = ["wall_clock_internal_timer"]
+        if "median_ms" in summary and "median_ms" in directions:
+            iterations = len(lane_metadata.get("iteration_durations_ms") or [])
+            metrics["median_ms"] = {"value": summary["median_ms"], "unit": "ms", "direction": directions["median_ms"]}
+            per_metric_variance["median_ms"] = lane_metadata.get("variance_classification")
+            per_metric_samples["median_ms"] = iterations
+        telemetry_policy = policy.get("telemetry_policy")
+        if telemetry_policy:
+            payload, digest, read_problems = read_telemetry(
+                repo_path, workload.get("cwd_subpath", "."), telemetry_policy["telemetry_results_path"]
+            )
+            evidence["telemetry_problems"] = list(read_problems)
+            if payload is not None:
+                summarized = summarize_telemetry(payload, directions, telemetry_policy)
+                metrics.update(summarized["metrics"])
+                per_metric_variance.update(summarized["per_metric_variance"])
+                per_metric_samples.update(summarized["per_metric_sample_count"])
+                evidence["telemetry_problems"] += summarized["problems"]
+                evidence["telemetry_notes"] = summarized["notes"]
+                refs.append(f"telemetry_results:{telemetry_policy['telemetry_results_path']}:sha256:{digest}")
+                scopes.append(payload["measurement_scope"])
+        if metrics:
             evidence["metric_vector"] = build_metric_vector(
                 fingerprint=fingerprint,
-                metrics={
-                    "median_ms": {
-                        "value": summary["median_ms"],
-                        "unit": "ms",
-                        "direction": directions["median_ms"],
-                    }
-                },
-                sample_count=len((command_result.lane_metadata or {}).get("iteration_durations_ms") or []),
+                metrics=metrics,
+                sample_count=min(per_metric_samples.values()) if per_metric_samples else 0,
                 variance_or_uncertainty={
-                    "variance_classification": (command_result.lane_metadata or {}).get("variance_classification"),
+                    "variance_classification": lane_metadata.get("variance_classification"),
                     "stdev_ms": summary.get("stdev_ms"),
+                    "per_metric": per_metric_variance,
+                    "per_metric_sample_count": per_metric_samples,
                 },
-                measurement_scope="wall_clock_internal_timer",
-                raw_evidence_refs=[f"{command_result.command_id}:stdout", f"{command_result.command_id}:stderr"],
+                measurement_scope="+".join(dict.fromkeys(scopes)),
+                raw_evidence_refs=refs,
             )
 
     integrity = (
@@ -298,6 +352,7 @@ def resolve_comparisons(
             selection=selection,
             regression_threshold_pct=float(workload.get("regression_threshold_pct", 10.0)),
             improvement_threshold_pct=float(workload.get("improvement_threshold_pct", 10.0)),
+            primary_metric=primary_metric(policy),
         )
         comparisons[workload_id] = build_comparison_artifact(
             run_id=run_id,
@@ -336,8 +391,10 @@ def apply_quality_gate(
             comparison["comparability_status"] = artifact["comparability_status"]
             comparison["baseline_run_id"] = artifact["baseline_run_id"]
             comparison["blocked_reasons"] = artifact["blocked_reasons"]
-            delta = artifact["metric_deltas"].get("median_ms")
-            comparison["baseline_median_ms"] = delta["baseline"] if delta else None
+            primary = artifact.get("primary_metric", "median_ms")
+            delta = artifact["metric_deltas"].get(primary)
+            comparison["primary_metric"] = primary
+            comparison["baseline_median_ms"] = delta["baseline"] if delta and primary == "median_ms" else None
             comparison["delta_ms"] = delta["delta"] if delta else None
             comparison["delta_pct"] = delta["delta_pct"] if delta else None
             if claim == "permitted":

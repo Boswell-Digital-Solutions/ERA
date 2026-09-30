@@ -64,3 +64,17 @@ The workload status in `baseline_artifact.json` follows the claim. A `regression
 An attacker can refresh the file entries in `hashes.json`. The reference and linkage checks still catch an edited artifact.
 
 `review.md` has a "Quality-Gated Evaluation" section for each opted-in workload. It shows the claim status, the quality status and reasons, the candidate fingerprint, the baseline run and fingerprint, the comparability and blocked reasons, the stability, each metric delta on its own row, the rejected baselines, and the artifact hashes. The word `improvement` appears only for a permitted claim.
+
+## Inference Telemetry (WP07)
+
+ERA does not measure an inference engine. An external tool writes an `InferenceTelemetry.v1` file into the target tree. A workload names it in `evaluation.telemetry_policy.telemetry_results_path`. `era_core/eval_telemetry.py` reads it and adds each declared metric to the `MetricVector.v1`.
+
+Supported metrics: `ttft_ms`, `tpot_ms`, `itl_ms`, `output_tokens_per_second`, `throughput_rps`, `ram_mb`, `vram_mb`, `context_tokens`, `output_tokens`. Only metrics with a direction in `evaluation.metrics` are used. A metric with bad samples is left out and named in the review.
+
+Each metric value is the median. A metric listed in `percentile_metrics` also gets `_p50`, `_p95`, and `_p99`. The p95 needs 20 samples and the p99 needs 100 samples, unless the manifest sets other minimums. A percentile with too few samples is omitted and the review says so.
+
+The claim rests on one `primary_metric` (default `median_ms`). It must have a `lower_is_better` or `higher_is_better` direction. Stability is judged for that metric. Every other metric shows its own delta and outcome (`better`, `worse`, `within_range`, `not_assessed`, `direction_mismatch`). ERA never combines metrics into one score. A worse side metric does not change the claim.
+
+A workload with telemetry must also match on `execution.hardware_fingerprint`, `execution.concurrency`, and `execution.batch_size`. The manifest can waive one through `non_binding_dimensions`.
+
+The vector records the telemetry file hash in `raw_evidence_refs` and the tool's scope in `measurement_scope`.

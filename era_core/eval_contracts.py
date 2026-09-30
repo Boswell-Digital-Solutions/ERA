@@ -421,6 +421,7 @@ def build_quality_efficiency_comparison(
     metric_deltas: dict[str, Any],
     blocked_reasons: list[str],
     baseline_rejections: list[dict[str, Any]] | None = None,
+    primary_metric: str = "median_ms",
     created_at: str | None = None,
 ) -> dict[str, Any]:
     return _seal(
@@ -439,6 +440,7 @@ def build_quality_efficiency_comparison(
             "metric_deltas": metric_deltas,
             "blocked_reasons": blocked_reasons,
             "baseline_rejections": baseline_rejections or [],
+            "primary_metric": primary_metric,
             "baseline_run_id": baseline_run_id,
             "candidate_run_id": candidate_run_id,
             "created_at": created_at or utc_now_text(),

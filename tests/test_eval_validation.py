@@ -226,7 +226,7 @@ class ReviewRenderingTests(ValidationBase):
             f"baseline fingerprint: `{comparison['baseline_fingerprint_id']}`",
             f"comparability: `{comparison['comparability_status']}`",
             "stability: candidate",
-            "| median_ms | lower_is_better |",
+            "| median_ms (primary) | lower_is_better |",
             self.read(second, "comparison.json")["sha256"],
         ):
             self.assertIn(text, review)

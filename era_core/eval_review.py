@@ -73,15 +73,28 @@ def render_eval_section(refs: dict[str, Any], artifacts: dict[str, dict[str, Any
             f"- stability: candidate `{_fmt(uncertainty.get('variance_classification'))}`,"
             f" baseline `{_fmt(baseline_stability)}`"
         )
-        lines.extend(["", "| metric | direction | candidate | baseline | delta | delta % |", "|---|---|---:|---:|---:|---:|"])
+        primary = (comparison or {}).get("primary_metric", "median_ms")
+        lines.append(f"- primary metric (the claim rests on this one only): `{primary}`")
+        lines.extend(
+            [
+                "",
+                "| metric | direction | candidate | baseline | delta | delta % | outcome |",
+                "|---|---|---:|---:|---:|---:|---|",
+            ]
+        )
         if deltas:
             for name, delta in sorted(deltas.items()):
+                label = f"{name} (primary)" if name == primary else name
                 lines.append(
-                    f"| {name} | {delta['direction']} | {delta['candidate']} | {delta['baseline']} |"
-                    f" {delta['delta']} | {delta['delta_pct']} |"
+                    f"| {label} | {delta['direction']} | {delta['candidate']} | {delta['baseline']} |"
+                    f" {delta['delta']} | {delta['delta_pct']} | {delta.get('outcome', 'n/a')} |"
                 )
         else:
-            lines.append("| none | n/a | n/a | n/a | n/a | n/a |")
+            lines.append("| none | n/a | n/a | n/a | n/a | n/a | n/a |")
+        for problem in entry.get("telemetry_problems", []):
+            lines.append(f"- telemetry problem: {problem}")
+        for note in entry.get("telemetry_notes", []):
+            lines.append(f"- telemetry note: {note}")
         if comparison is not None and comparison["claim_status"] == "permitted":
             lines.append(
                 f"- efficiency outcome: `{comparison['efficiency_status']}`, reported because quality passed,"

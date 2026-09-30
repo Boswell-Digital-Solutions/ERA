@@ -34,6 +34,9 @@ CLAIM_STATUSES = frozenset(
         "no_baseline",
     }
 )
+REJECTION_REASONS = frozenset(
+    {"evidence_invalid", "fingerprint_incomparable", "quality_failed", "quality_unproven"}
+)
 PERMITTED_EFFICIENCY_STATUSES = frozenset({"improvement", "regression", "within_range"})
 METRIC_DIRECTIONS = frozenset({"lower_is_better", "higher_is_better", "target_range", "informational_only"})
 
@@ -407,6 +410,7 @@ def build_quality_efficiency_comparison(
     comparison_dimensions: dict[str, Any],
     metric_deltas: dict[str, Any],
     blocked_reasons: list[str],
+    baseline_rejections: list[dict[str, Any]] | None = None,
     created_at: str | None = None,
 ) -> dict[str, Any]:
     return _seal(
@@ -424,6 +428,7 @@ def build_quality_efficiency_comparison(
             "comparison_dimensions": comparison_dimensions,
             "metric_deltas": metric_deltas,
             "blocked_reasons": blocked_reasons,
+            "baseline_rejections": baseline_rejections or [],
             "baseline_run_id": baseline_run_id,
             "candidate_run_id": candidate_run_id,
             "created_at": created_at or utc_now_text(),
@@ -460,6 +465,11 @@ def validate_quality_efficiency_comparison(payload: dict[str, Any]) -> list[str]
     _check_enum(payload, "comparability_status", COMPARABILITY_STATUSES, label, errors)
     _check_enum(payload, "efficiency_status", EFFICIENCY_STATUSES, label, errors)
     _check_enum(payload, "claim_status", CLAIM_STATUSES, label, errors)
+    rejections = payload.get("baseline_rejections", [])
+    if not isinstance(rejections, list) or any(
+        not isinstance(item, dict) or item.get("reason") not in REJECTION_REASONS for item in rejections
+    ):
+        errors.append(f"{label} baseline_rejections must list entries with a known reason.")
     if not errors:
         errors.extend(_check_claim_consistency(payload, label))
     _check_hash(payload, label, errors)

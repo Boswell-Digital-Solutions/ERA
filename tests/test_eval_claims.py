@@ -138,11 +138,61 @@ class DecisionTableTests(unittest.TestCase):
         decision, _ = decide(evidence(median=10), [])
         self.assertEqual(decision["claim_status"], "no_baseline")
 
-    def test_prior_that_failed_quality_is_not_a_baseline(self) -> None:
+    def test_comparable_prior_that_failed_quality_is_rejected_as_baseline(self) -> None:  # N21
         decision, selection = decide(evidence(median=10), [evidence("run-b", 100, accuracy=0.1)])
-        self.assertEqual(decision["claim_status"], "evidence_blocked")
+        self.assertEqual(decision["claim_status"], "no_baseline")
+        self.assertEqual(decision["efficiency_status"], "not_evaluated")
+        self.assertEqual(decision["metric_deltas"], {})
+        self.assertEqual([(r["run_id"], r["reason"]) for r in selection["rejected"]], [("run-b", "quality_failed")])
         self.assertIn("not a fair baseline", " ".join(decision["blocked_reasons"]))
-        self.assertEqual(len(selection["rejected"]), 1)
+
+    def test_newest_prior_quality_failed_selects_older_qualified_run(self) -> None:  # N22
+        older = evidence("run-1", 200)
+        newer_failed = evidence("run-2", 100, accuracy=0.1)
+        newest_failed = evidence("run-3", 90, accuracy=0.2)
+        decision, selection = decide(evidence(median=50), [older, newer_failed, newest_failed])
+        self.assertEqual(selection["baseline"]["run_id"], "run-1")
+        self.assertEqual(decision["claim_status"], "permitted")
+        self.assertEqual(decision["metric_deltas"]["median_ms"]["baseline"], 200)
+        self.assertEqual(sorted(r["run_id"] for r in selection["rejected"]), ["run-2", "run-3"])
+
+    def test_unproven_prior_is_rejected_with_its_own_reason(self) -> None:
+        prior = evidence("run-b", 100)
+        gate = build_quality_gate_artifact(
+            fingerprint=prior["fingerprint"],
+            metric_results={},
+            quality_floors=FLOORS,
+            sample_count=10,
+            raw_evidence_refs=["r"],
+        )
+        prior["quality_gate"] = gate
+        decision, selection = decide(evidence(median=10), [prior])
+        self.assertEqual(selection["rejected"][0]["reason"], "quality_unproven")
+        self.assertEqual(decision["claim_status"], "no_baseline")
+
+    def test_quality_failed_and_incomparable_mix_is_no_baseline(self) -> None:
+        failed = evidence("run-1", 100, accuracy=0.1)
+        other_data = evidence("run-2", 100, **{"evaluation_identity.dataset_or_fixture_hash": "d2"})
+        decision, selection = decide(evidence(median=10), [failed, other_data])
+        self.assertEqual(decision["claim_status"], "no_baseline")
+        self.assertEqual(sorted(r["reason"] for r in selection["rejected"]), ["fingerprint_incomparable", "quality_failed"])
+
+    def test_incomparable_prior_that_also_failed_quality_is_incomparable_not_quality(self) -> None:
+        prior = evidence("run-b", 100, accuracy=0.1, **{"evaluation_identity.dataset_or_fixture_hash": "d2"})
+        decision, selection = decide(evidence(median=10), [prior])
+        self.assertEqual(selection["rejected"][0]["reason"], "fingerprint_incomparable")
+        self.assertEqual(decision["claim_status"], "incomparable")
+
+    def test_rejection_ledger_is_in_the_comparison_artifact(self) -> None:
+        candidate = evidence(median=10)
+        decision, selection = decide(candidate, [evidence("run-b", 100, accuracy=0.1)])
+        artifact = build_comparison_artifact(
+            run_id="run-c", workload_id="fixture_workload", candidate=candidate, selection=selection, decision=decision
+        )
+        self.assertEqual(artifact["baseline_rejections"][0]["reason"], "quality_failed")
+        self.assertEqual(validate_quality_efficiency_comparison(artifact), [])
+        artifact["baseline_rejections"][0]["reason"] = "vibes"
+        self.assertTrue(validate_quality_efficiency_comparison(artifact))
 
     def test_tampered_prior_is_not_a_baseline(self) -> None:
         prior = evidence("run-b", 100)
@@ -248,9 +298,12 @@ class EndToEndTests(unittest.TestCase):
         self.assertIn("Classification: `quality_blocked`", review)
 
     def test_a_baseline_that_failed_quality_is_not_used(self) -> None:
-        _, comparison, _, _ = self.run_pair(0.4, 0.95)
+        runs, comparison, _, _ = self.run_pair(0.4, 0.95)
         self.assertIsNone(comparison["baseline_run_id"])
-        self.assertEqual(comparison["claim_status"], "evidence_blocked")
+        self.assertEqual(comparison["claim_status"], "no_baseline")
+        self.assertEqual(
+            [(r["run_id"], r["reason"]) for r in comparison["baseline_rejections"]], [(runs[0].name, "quality_failed")]
+        )
 
 
 if __name__ == "__main__":

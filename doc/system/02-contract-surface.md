@@ -32,7 +32,7 @@ When the quality gate is not `passed`, the workload status becomes `quality_bloc
 
 ## Claim Gate (WP04)
 
-`era_core/eval_claims.py` selects the baseline and decides the claim. A prior run is a baseline only when its evidence validates, its quality gate passed, and its fingerprint matches the required dimensions. The result is written as `comparison.json` in the workload folder.
+`era_core/eval_claims.py` selects the baseline and decides the claim. A prior run is a baseline only when its evidence validates, its fingerprint matches the required dimensions, and its quality gate passed. ERA keeps every rejected run in `baseline_rejections` with a reason: `evidence_invalid`, `fingerprint_incomparable`, `quality_failed`, or `quality_unproven`. The result is written as `comparison.json` in the workload folder.
 
 The checks run in this order, and the first one that fails sets the claim:
 
@@ -40,7 +40,7 @@ The checks run in this order, and the first one that fails sets the claim:
 2. A failed quality gate gives `quality_blocked`.
 3. Unproven quality gives `quality_unproven`.
 4. No prior run gives `no_baseline`.
-5. Prior runs that do not match give `incomparable`. Prior runs with unusable evidence give `evidence_blocked`.
+5. Prior runs exist but none qualifies. Comparable priors that failed or lacked quality give `no_baseline`. Otherwise priors that do not match give `incomparable`. Priors with unusable evidence give `evidence_blocked`.
 6. Unstable timing gives `no_claim_unstable`.
 7. Otherwise the median delta against the workload thresholds gives `improvement`, `regression`, or `within_range`, with the claim `permitted`.
 

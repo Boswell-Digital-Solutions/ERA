@@ -224,6 +224,35 @@ class ComparisonTests(unittest.TestCase):
             )
         )
 
+    def test_unstable_needs_its_own_claim_status(self) -> None:  # operator ruling 1
+        ok = make_comparison(efficiency_status="unstable", claim_status="no_claim_unstable", blocked_reasons=["noisy"])
+        self.assertEqual(validate_quality_efficiency_comparison(ok), [])
+        for status in ("permitted", "evidence_blocked"):
+            bad = make_comparison(efficiency_status="unstable", claim_status=status, blocked_reasons=["x"])
+            self.assertTrue(validate_quality_efficiency_comparison(bad), status)
+        wrong = make_comparison(efficiency_status="within_range", claim_status="no_claim_unstable", blocked_reasons=["x"])
+        self.assertTrue(validate_quality_efficiency_comparison(wrong))
+
+    def test_no_claim_unstable_still_needs_passed_quality_and_baseline(self) -> None:
+        bad = make_comparison(
+            efficiency_status="unstable", claim_status="no_claim_unstable", quality_status="unproven", blocked_reasons=["x"]
+        )
+        self.assertTrue(validate_quality_efficiency_comparison(bad))
+
+    def test_permitted_needs_a_direction_result(self) -> None:
+        self.assertTrue(validate_quality_efficiency_comparison(make_comparison(efficiency_status="not_evaluated")))
+
+    def test_no_baseline_is_a_valid_blocked_claim(self) -> None:
+        comparison = make_comparison(
+            baseline_fingerprint_id=None,
+            baseline_run_id=None,
+            comparability_status="unknown",
+            efficiency_status="not_evaluated",
+            claim_status="no_baseline",
+            blocked_reasons=["No prior run."],
+        )
+        self.assertEqual(validate_quality_efficiency_comparison(comparison), [])
+
     def test_invalid_enum_and_tamper_fail(self) -> None:
         self.assertTrue(validate_quality_efficiency_comparison(make_comparison(claim_status="great")))
         errors = validate_quality_efficiency_comparison(tamper(make_comparison(), workload_id="other"))

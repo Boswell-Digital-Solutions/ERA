@@ -59,6 +59,8 @@ def determine_efficiency_classification(
         return "blocked_by_missing_evidence"
     if any(item.get("comparison_status") == "quality_unproven" for item in comparisons):
         return "quality_unproven"
+    if any(item.get("comparison_status") == "incomparable" for item in comparisons):
+        return "incomparable"
     if any(item["finding_type"] == "efficiency_regression_with_baseline" for item in findings):
         return "regression_with_baseline"
 

@@ -28,9 +28,17 @@ The results file is ``{"metric_results": {...}, "sample_count": N}``.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
+from era_core.eval_claims import (
+    COMPARISON_STATUS_BY_CLAIM,
+    build_comparison_artifact,
+    decide_claim,
+    load_prior_evidence,
+    select_eligible_baseline,
+)
 from era_core.eval_comparability import DEFAULT_REQUIRED_DIMENSIONS, is_known_dimension
 from era_core.eval_contracts import (
     EVALUATION_IDENTITY_FIELDS,
@@ -259,21 +267,84 @@ QUALITY_CLAIM_BY_STATUS = {
 }
 
 
-def apply_quality_gate(baseline_artifact: dict[str, Any], eval_evidence: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """Block improvement and regression claims for a workload whose quality is not proven.
+def workload_dirname(workload_id: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", workload_id.lower()).strip("_")
+
+
+def resolve_comparisons(
+    *,
+    run_id: str,
+    artifacts_root: Path,
+    manifest: dict[str, Any],
+    eval_evidence: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Select a comparable baseline and decide the claim for every v2 workload."""
+    workloads = {item.get("workload_id"): item for item in manifest.get("workloads", [])}
+    comparisons: dict[str, dict[str, Any]] = {}
+    for workload_id, candidate in eval_evidence.items():
+        workload = workloads[workload_id]
+        policy = eval_policy(workload) or {}
+        selection: dict[str, Any] = {"baseline": None, "comparison": None, "rejected": [], "considered": 0}
+        if candidate["fingerprint"] is not None:
+            priors = load_prior_evidence(artifacts_root, run_id, workload_id, workload_dirname(workload_id))
+            selection = select_eligible_baseline(
+                candidate["fingerprint"],
+                priors,
+                required_dimensions(policy),
+                tuple(policy.get("non_binding_dimensions") or ()),
+            )
+        decision = decide_claim(
+            candidate=candidate,
+            selection=selection,
+            regression_threshold_pct=float(workload.get("regression_threshold_pct", 10.0)),
+            improvement_threshold_pct=float(workload.get("improvement_threshold_pct", 10.0)),
+        )
+        comparisons[workload_id] = build_comparison_artifact(
+            run_id=run_id,
+            workload_id=workload_id,
+            candidate=candidate,
+            selection=selection,
+            decision=decision,
+        )
+    return comparisons
+
+
+def apply_quality_gate(
+    baseline_artifact: dict[str, Any],
+    eval_evidence: dict[str, dict[str, Any]],
+    comparisons: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Replace the timing-only status of each v2 workload with its gated claim.
 
     The timing result stays visible as ``timing_comparison_status``. A quality
     failure is the controlling status. It is never reduced to a regression.
     Legacy workloads (no entry in ``eval_evidence``) are left as they are.
+    Without ``comparisons`` only the quality gate applies (WP03 behavior).
     """
     for comparison in baseline_artifact.get("comparisons", []):
         evidence = eval_evidence.get(comparison["workload_id"])
         if evidence is None:
             continue
+        artifact = (comparisons or {}).get(comparison["workload_id"])
         comparison["evaluation"] = True
         comparison["quality_status"] = evidence["quality_status"]
         comparison["fingerprint_id"] = (evidence["fingerprint"] or {}).get("fingerprint_id")
         comparison["timing_comparison_status"] = comparison["comparison_status"]
+        if artifact is not None:
+            claim = artifact["claim_status"]
+            comparison["claim_status"] = claim
+            comparison["comparability_status"] = artifact["comparability_status"]
+            comparison["baseline_run_id"] = artifact["baseline_run_id"]
+            comparison["blocked_reasons"] = artifact["blocked_reasons"]
+            delta = artifact["metric_deltas"].get("median_ms")
+            comparison["baseline_median_ms"] = delta["baseline"] if delta else None
+            comparison["delta_ms"] = delta["delta"] if delta else None
+            comparison["delta_pct"] = delta["delta_pct"] if delta else None
+            if claim == "permitted":
+                comparison["comparison_status"] = artifact["efficiency_status"]
+            elif comparison["comparison_status"] != "workload_failed_or_unproven":
+                comparison["comparison_status"] = COMPARISON_STATUS_BY_CLAIM[claim]
+            continue
         blocked = QUALITY_CLAIM_BY_STATUS.get(evidence["quality_status"])
         if blocked and comparison["comparison_status"] != "workload_failed_or_unproven":
             comparison["comparison_status"] = blocked

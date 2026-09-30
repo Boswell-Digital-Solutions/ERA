@@ -192,13 +192,24 @@ Validation checks that the receipt matches the fingerprint's execution identity,
 
 Every comparison for an opted-in workload must now match on `execution.sandbox`, `execution.network`, and `execution.target_filesystem`. A contained run and an uncontained run never compare as equal (operator ruling 3).
 
-## Evaluation Export (WP12, ERA side)
+## Evaluation Export (WP12)
 
-A run with an opted-in workload writes `evaluation_export.json` (`ERAEvaluationExport.v1`). It summarizes each workload's claim, gates, metrics, baseline, blocked reasons, and artifact hashes. It holds hashes and statuses only. It carries a fixed authority text: ERA evidence, not canonical truth. The `evidence_hash_chain` lists it as `evaluation_export`.
+A run with an opted-in workload writes `evaluation_export.json`. It is an `era_evaluation_export` v1 artifact: the shared envelope with the admitted payload. `forge_contract_core` admitted the family on 2026-09-30 (RFC-ERA-EVAL-01). ERA is the only producer.
 
-`era_core/eval_export.py` rebuilds the export from the run folder during validation. Any difference fails the run. A run without an opted-in workload has no export.
+The payload summarizes each workload's claim, gates, metrics, baseline, blocked reasons, and artifact hashes. It holds hashes and statuses only. Its `authority` text is fixed: ERA evidence, not canonical truth. The `evidence_hash_chain` lists the export as `evaluation_export`, by payload digest.
 
-The contract is local to ERA. `consumer_contract_status` says `local_to_era`. DataForge Local persistence, a Forge_Command review surface, and promotion to `forge_contract_core` need separate decisions. See `docs/eval/BDS-ERA-EVAL-v0.1_WP12_INTERFACE.md`.
+`era_core/eval_contract_export.py` applies the contract's rules:
+
+- A measured non-count quantity is a canonical decimal string. There is no exponent, no leading `+`, no unneeded zero, and no negative zero. A count stays an integer. No JSON float appears anywhere.
+- `workloads[]` is sorted by `workload_id`. A set-like array is sorted and has no duplicate. A long reason is cut to 1024 characters. More than 64 reasons are replaced by a count.
+- `payload_digest` is the self-digest under `forge.rfc8785-jcs-sha256.v1` with domain `forge:era-evaluation-export:v1`. The digest field is excluded from the hashed projection.
+- The attesting user, `executes_target_code`, and local paths are dropped.
+
+The envelope `signature` is `unsigned:<payload digest>`. It is a digest reference, not a cryptographic signature, because ERA holds no signing key.
+
+`era_core/eval_export.py` rebuilds the artifact from the run folder during validation and rejects any difference. A run without an opted-in workload has no export.
+
+DataForge Local intake and the Forge_Command route are separate work. They consume the admitted contract. See `docs/eval/BDS-ERA-EVAL-v0.1_WP12_INTERFACE.md`.
 
 ## Baseline Snapshot (operator decision 4)
 

@@ -1,8 +1,10 @@
-"""Evaluation export for downstream systems (BDS-ERA-EVAL-v0.1 WP12, ERA side).
+"""Evaluation export for downstream systems (BDS-ERA-EVAL-v0.1 WP12).
 
-ERA writes one ``ERAEvaluationExport.v1`` into each run that has opted-in
-workloads. It is the producer interface for a later DataForge Local persistence
-slice and a Forge_Command review surface. ERA does not write to either system.
+ERA writes one ``era_evaluation_export`` v1 artifact into each run that has opted-in
+workloads. The contract is admitted in ``forge_contract_core`` (RFC-ERA-EVAL-01,
+accepted 2026-09-30). The file is the shared envelope with the admitted payload.
+It is the producer interface for a DataForge Local drop-directory intake and a
+Forge_Command read-only route. ERA does not write to either system.
 
 The export is a summary of files that already exist in the run folder. Validation
 rebuilds it from those files and rejects any difference, so it cannot say more
@@ -17,15 +19,15 @@ from pathlib import Path
 from typing import Any
 
 from era_core.eval_review import EVAL_KINDS
-from era_core.hashing import sha256_json
-
-EXPORT_SCHEMA = "ERAEvaluationExport.v1"
-EXPORT_FILENAME = "evaluation_export.json"
-AUTHORITY_STATEMENT = (
-    "ERA evidence only. Not canonical truth until reconciled and reviewed downstream. "
-    "ERA holds no approval, promotion, routing, or mutation authority."
+from era_core.eval_contract_export import (
+    AUTHORITY as AUTHORITY_STATEMENT,
+    ProjectionError,
+    build_artifact,
+    to_contract_payload,
 )
-CONSUMER_CONTRACT_STATUS = "local_to_era"  # not promoted to forge_contract_core (AUTHORITY_GAP-01)
+
+EXPORT_SCHEMA = "era.evaluation_export.v1"
+EXPORT_FILENAME = "evaluation_export.json"
 
 
 def _load(path: Path) -> dict[str, Any] | None:
@@ -56,8 +58,8 @@ def _baseline_block(snapshot: dict[str, Any] | None, ref: dict[str, Any] | None)
     }
 
 
-def build_evaluation_export(run_dir: Path) -> dict[str, Any] | None:
-    """Build the export from the run folder. Return None when no workload opted in."""
+def build_evaluation_summary(run_dir: Path) -> dict[str, Any] | None:
+    """Read the run folder into ERA's own summary. Return None when no workload opted in."""
     run = _load(run_dir / "run.json")
     bundle = _load(run_dir / "evidence" / "efficiency" / "efficiency_evidence_bundle.json")
     if run is None or bundle is None:
@@ -115,28 +117,42 @@ def build_evaluation_export(run_dir: Path) -> dict[str, Any] | None:
                 },
             }
         )
-    payload = {
-        "schema_version": EXPORT_SCHEMA,
+    return {
         "run_id": run["run_id"],
         "repo_id": run["repo_id"],
         "commit_sha": run["commit_sha"],
         "run_status": run["status"],
         "efficiency_lane_classification": lane_score.get("classification"),
-        "execution_posture": run.get("execution_posture"),
+        "execution_posture": run["execution_posture"],
         "workloads": workloads,
-        "authority": AUTHORITY_STATEMENT,
-        "consumer_contract_status": CONSUMER_CONTRACT_STATUS,
         "created_at": run["completed_at"],
     }
-    payload["sha256"] = sha256_json(payload)
-    return payload
+
+
+def build_evaluation_export(run_dir: Path) -> dict[str, Any] | None:
+    """Build the admitted artifact from the run folder. Return None when no workload opted in.
+
+    Raises ``ProjectionError`` when the summary cannot be projected to the contract.
+    """
+    summary = build_evaluation_summary(run_dir)
+    if summary is None:
+        return None
+    return build_artifact(to_contract_payload(summary))
+
+
+def export_reference(artifact: dict[str, Any]) -> str:
+    """The hash-chain reference of an export: the payload digest without its ``sha256:`` prefix."""
+    return str(artifact["payload"]["payload_digest"]).removeprefix("sha256:")
 
 
 def validate_evaluation_export(run_dir: Path, chain: dict[str, Any]) -> list[str]:
     """Rebuild the export and compare. Fail closed on any difference or missing piece."""
-    expected = build_evaluation_export(run_dir)
     path = run_dir / EXPORT_FILENAME
     entry = chain.get("evaluation_export")
+    try:
+        expected = build_evaluation_export(run_dir)
+    except ProjectionError as error:
+        return [f"The run evidence cannot be projected to the admitted contract: {error}"]
     if expected is None:
         if path.exists() or entry:
             return ["An evaluation export exists but the run has no opted-in workload."]
@@ -145,15 +161,18 @@ def validate_evaluation_export(run_dir: Path, chain: dict[str, Any]) -> list[str
     stored = _load(path)
     if stored is None:
         return [f"{EXPORT_FILENAME} is missing or not valid JSON."]
-    if stored.get("schema_version") != EXPORT_SCHEMA:
-        errors.append(f"{EXPORT_FILENAME} has an invalid schema_version.")
-    if stored.get("authority") != AUTHORITY_STATEMENT:
+    payload = stored.get("payload") if isinstance(stored.get("payload"), dict) else {}
+    if stored.get("artifact_family") != "era_evaluation_export" or payload.get("schema_version") != EXPORT_SCHEMA:
+        errors.append(f"{EXPORT_FILENAME} is not an {EXPORT_SCHEMA} artifact.")
+    if payload.get("authority") != AUTHORITY_STATEMENT:
         errors.append(f"{EXPORT_FILENAME} authority statement was changed.")
     if stored != expected:
         differing = sorted(key for key in set(stored) | set(expected) if stored.get(key) != expected.get(key))
+        if stored.get("payload") != expected["payload"]:
+            differing += [f"payload.{key}" for key in sorted(set(payload) | set(expected["payload"])) if payload.get(key) != expected["payload"].get(key)]
         errors.append(f"{EXPORT_FILENAME} differs from the run evidence in: {', '.join(differing)}.")
     if not entry:
         errors.append("Evidence hash chain is missing the evaluation export.")
-    elif entry.get("sha256") != stored.get("sha256") or entry.get("path") != EXPORT_FILENAME:
+    elif stored.get("payload") and (entry.get("sha256") != export_reference(stored) or entry.get("path") != EXPORT_FILENAME):
         errors.append("Evidence hash chain has a stale evaluation export reference.")
     return errors

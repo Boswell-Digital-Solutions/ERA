@@ -1,7 +1,7 @@
 # BDS-ERA-EVAL-v0.1 — WP12 Interface (durable and UI integration)
 
 Date: 2026-09-30
-Status: ERA side built. Downstream side needs operator decisions (see the last section).
+Status: contract admitted (`forge_contract_core`, 2026-09-30). ERA emits it. DataForge Local intake and the Forge_Command route are separate bounded work. The section "Decisions for the operator" below records the decisions the operator made on 2026-09-30.
 
 ## What WP12 asks for
 
@@ -56,3 +56,12 @@ These need your answer before any change outside ERA.
 ## Authority check
 
 ERA still finds, measures, proves, and reports. The export gives no approval, promotion, routing, or mutation authority. No other repository changed.
+
+## Update 2026-09-30: decisions made
+
+1. Promote the contract: yes. Admitted as `era_evaluation_export` v1 (RFC-ERA-EVAL-01). Measured quantities are canonical decimal strings, and the digest is the self-digest under `forge.rfc8785-jcs-sha256.v1`.
+2. DataForge Local intake: a drop directory.
+3. Forge_Command: a separate read-only route. It does not go through Centipede.
+4. Baseline chain: kept. ERA writes a sealed baseline snapshot into each run that names a baseline, and the export carries a `baseline` block.
+
+The shape in the field table above is the local v1 shape. The admitted shape is the shared envelope with the payload described in `doc/system/02-contract-surface.md` and in the contract's `doc/system/02-admitted-families.md`.

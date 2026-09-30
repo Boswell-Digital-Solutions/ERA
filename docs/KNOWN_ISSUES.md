@@ -28,10 +28,11 @@ Findings for this repo. Each entry has a date, the problem, the root cause, the 
 
 ## 2026-09-30 — No downstream consumer for evaluation evidence
 
-**Status: OPEN.**
+**Status: OPEN (producer side closed 2026-09-30).**
 
-**Problem.** ERA writes `evaluation_export.json` (`ERAEvaluationExport.v1`) for runs with opted-in workloads. Nothing reads it. DataForge Local has no ERA or evaluation ingestion surface. Forge_Command shows ERA evidence only through the Centipede inbox, which takes findings and incidents, not evaluation claims.
+**Problem.** ERA writes `evaluation_export.json`. Nothing reads it. DataForge Local has no ERA or evaluation ingestion surface. Forge_Command shows ERA evidence only through the Centipede inbox, which takes findings and incidents, not evaluation claims.
 
-**Root cause.** The export contract is local to ERA (BDS-ERA-EVAL-v0.1 AUTHORITY_GAP-01). A consumer in another repo needs a promoted contract in `forge_contract_core`. Promotion is a separate authorization.
+**Progress.** The contract is admitted in `forge_contract_core` (`era_evaluation_export` v1, RFC-ERA-EVAL-01, accepted 2026-09-30). ERA emits the admitted artifact and validates it against the contract's own vectors and validator.
 
-**Scope.** ERA side is closed (export, validation, hash chain). Persistence, the review surface, and contract promotion are open and need operator decisions. See `docs/eval/BDS-ERA-EVAL-v0.1_WP12_INTERFACE.md`.
+**Open.** DataForge Local drop-directory intake, and a separate Forge_Command read-only route. Each is its own bounded plan and PR. The envelope `signature` is an unsigned digest reference: ERA holds no signing key. A consumer must not read it as a signature.
+

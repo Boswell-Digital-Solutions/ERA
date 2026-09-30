@@ -22,6 +22,7 @@ from era_core.contracts import (
     build_tool_raw_artifacts,
     promote_normalized_results,
 )
+from era_core.eval_lane import apply_quality_gate, build_eval_evidence, resolve_comparisons, workload_dirname
 from era_core.efficiency import (
     apply_efficiency_tooling,
     build_efficiency_baseline_artifact,
@@ -245,6 +246,26 @@ def _determine_read_only_invariant(
     )
 
 
+def _write_eval_evidence(
+    efficiency_dir: Path,
+    eval_evidence: dict[str, dict[str, Any]],
+    eval_comparisons: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Write per-workload evaluation artifacts. Return their paths and hashes."""
+    refs: dict[str, Any] = {}
+    for workload_id, evidence in sorted(eval_evidence.items()):
+        directory = efficiency_dir / "eval" / workload_dirname(workload_id)
+        entry: dict[str, Any] = {"quality_status": evidence["quality_status"], "problems": evidence["problems"]}
+        artifacts = {**evidence, "comparison": eval_comparisons.get(workload_id)}
+        for key in ("fingerprint", "quality_gate", "metric_vector", "comparison"):
+            if artifacts[key] is not None:
+                path = directory / f"{key}.json"
+                write_json(path, artifacts[key])
+                entry[key] = {"path": str(path.relative_to(efficiency_dir.parent)), "sha256": artifacts[key]["sha256"]}
+        refs[workload_id] = entry
+    return refs
+
+
 def _determine_run_status(
     command_results: list[CommandResult],
     lane_classifications: dict[str, str],
@@ -256,7 +277,16 @@ def _determine_run_status(
     if blocked and not executed:
         return "blocked"
     if blocked or skipped or degraded or any(
-        status in {"unproven", "unstable", "blocked_by_missing_evidence", "blocked_by_missing_tool"}
+        status
+        in {
+            "unproven",
+            "unstable",
+            "blocked_by_missing_evidence",
+            "blocked_by_missing_tool",
+            "quality_blocked",
+            "quality_unproven",
+            "incomparable",
+        }
         for status in lane_classifications.values()
     ):
         return "completed_partial"
@@ -475,6 +505,25 @@ def execute_run(
             baseline_ref=baseline_ref,
             baseline_commit=baseline_commit,
         )
+        eval_evidence = build_eval_evidence(
+            run_id=run_id,
+            repo_id=repo_id,
+            repo_path=repo_path,
+            commit_sha=pre_snapshot["head"] or "UNCOMMITTED",
+            manifest=efficiency_manifest or {},
+            command_results=efficiency_results,
+            execution_posture={
+                "executes_target_code": True,
+                **(sandbox.posture() if sandbox is not None else none_posture()),
+            },
+        )
+        eval_comparisons = resolve_comparisons(
+            run_id=run_id,
+            artifacts_root=run_paths.root.parent,
+            manifest=efficiency_manifest or {},
+            eval_evidence=eval_evidence,
+        )
+        baseline_artifact = apply_quality_gate(baseline_artifact, eval_evidence, eval_comparisons)
         normalized_results.extend(
             build_efficiency_normalized_results(
                 run_id=run_id,
@@ -529,6 +578,7 @@ def execute_run(
         write_json(run_paths.redundancy_evidence_bundle, redundancy_bundle)
         evidence_bundle_refs.append(str(run_paths.redundancy_evidence_bundle))
     if "efficiency" in requested_lanes:
+        eval_refs = _write_eval_evidence(run_paths.efficiency_dir, eval_evidence, eval_comparisons)
         efficiency_bundle = _build_lane_evidence_bundle(
             schema_version="EfficiencyEvidenceBundle.v1",
             run_id=run_id,
@@ -540,6 +590,7 @@ def execute_run(
             extra={
                 "workload_manifest": efficiency_manifest or {},
                 "baseline_artifact_ref": str(run_paths.efficiency_baseline_artifact),
+                "evaluation_evidence_refs": eval_refs,
             },
         )
         evidence_bundles["efficiency"] = efficiency_bundle

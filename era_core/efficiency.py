@@ -403,6 +403,12 @@ def build_efficiency_normalized_results(
                 parse_warnings.append("No baseline artifact was available, so no regression or improvement claim was made.")
             elif status == "unstable":
                 parse_warnings.append("Workload timing variance was too unstable for a mechanical claim.")
+            elif status == "incomparable":
+                parse_warnings.append("No baseline matched the required comparison dimensions, so no claim was made.")
+            elif status in {"quality_blocked", "quality_unproven", "evidence_blocked"}:
+                parse_warnings.append(
+                    f"Quality gate result is `{status}`, so no improvement or regression claim was made."
+                )
             elif status == "regression":
                 delta_pct = comparison.get("delta_pct") or 0.0
                 parsed_findings.append(

@@ -51,10 +51,19 @@ def determine_efficiency_classification(
         return "blocked_by_missing_evidence"
     if not executed:
         return "unproven"
+    comparisons = baseline_artifact.get("comparisons", [])
+    # A quality failure controls the outcome. Timing cannot outweigh it.
+    if any(item.get("comparison_status") == "quality_blocked" for item in comparisons):
+        return "quality_blocked"
+    if any(item.get("comparison_status") == "evidence_blocked" for item in comparisons):
+        return "blocked_by_missing_evidence"
+    if any(item.get("comparison_status") == "quality_unproven" for item in comparisons):
+        return "quality_unproven"
+    if any(item.get("comparison_status") == "incomparable" for item in comparisons):
+        return "incomparable"
     if any(item["finding_type"] == "efficiency_regression_with_baseline" for item in findings):
         return "regression_with_baseline"
 
-    comparisons = baseline_artifact.get("comparisons", [])
     if any(item.get("comparison_status") == "unstable" for item in comparisons):
         return "unstable"
     if not any(item.get("comparison_status") in {"within_range", "improvement", "regression"} for item in comparisons):

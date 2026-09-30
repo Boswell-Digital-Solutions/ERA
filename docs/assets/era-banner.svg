@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="100%" height="100%">
+  <defs>
+    <!-- Dark slate / carbon backdrop -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070a0f"/>
+      <stop offset="50%" stop-color="#0f141d"/>
+      <stop offset="100%" stop-color="#06080c"/>
+    </linearGradient>
+
+    <!-- Hardened Tool Steel -->
+    <linearGradient id="steelBeam" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="50%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+
+    <!-- Calibrated Amber (Tension & Proof) -->
+    <linearGradient id="amberGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+
+    <!-- Precision Telemetry Cyan -->
+    <linearGradient id="cyanLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+
+    <!-- Engineering Blueprint Grid -->
+    <pattern id="evalGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#38bdf8" stroke-width="0.5" stroke-opacity="0.06"/>
+      <circle cx="24" cy="24" r="0.75" fill="#38bdf8" fill-opacity="0.15"/>
+    </pattern>
+  </defs>
+
+  <style>
+    .font-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+    .font-sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .title { font-weight: 900; letter-spacing: 14px; fill: #f8fafc; }
+    .badge-text { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; fill: #f59e0b; }
+    .lane-text { font-size: 12px; font-weight: 600; fill: #94a3b8; letter-spacing: 1.5px; }
+    .code-chip { font-size: 11px; fill: #38bdf8; letter-spacing: 0.5px; }
+  </style>
+
+  <!-- Frame & Technical Base -->
+  <rect width="1200" height="400" rx="14" fill="url(#bgGrad)" stroke="#1e293b" stroke-width="2"/>
+  <rect width="1200" height="400" rx="14" fill="url(#evalGrid)"/>
+
+  <!-- Left: Identity, Doctrine & Architecture Hierarchy -->
+  <g transform="translate(80, 75)">
+    <!-- Plan / Standard Badge -->
+    <rect x="0" y="0" width="310" height="26" rx="4" fill="#f59e0b" fill-opacity="0.08" stroke="#f59e0b" stroke-width="1"/>
+    <text x="12" y="17" class="font-mono badge-text">BDS-ERA-EVAL-v0.1 // QUALITY-GATED</text>
+
+    <!-- Main Title -->
+    <text x="0" y="90" font-size="76" class="font-sans title">ERA</text>
+
+    <!-- Subtitle / Mission Doctrine -->
+    <text x="4" y="128" font-size="16" font-weight="600" fill="#e2e8f0" class="font-sans" letter-spacing="1px">
+      Rigorous Evaluation &amp; Efficiency Assurance
+    </text>
+    <text x="4" y="152" font-size="13" class="font-mono" fill="#64748b">
+      Accuracy • Redundancy • Quality-Floor Gated Efficiency
+    </text>
+
+    <!-- Technical Rule Box: The Core Invariant -->
+    <g transform="translate(0, 180)">
+      <rect width="450" height="66" rx="6" fill="#090d16" stroke="#334155" stroke-width="1.2"/>
+      <line x1="0" y1="0" x2="0" y2="66" stroke="#f59e0b" stroke-width="4"/>
+      <text x="16" y="24" class="font-mono code-chip" fill="#f59e0b">FAIL-CLOSED PRINCIPLE:</text>
+      <text x="16" y="46" class="font-mono" font-size="12" fill="#94a3b8">
+        No efficiency gain without a pinned quality pass.
+      </text>
+    </g>
+  </g>
+
+  <!-- Right: Mechanical Tension Assembly (Vise Clamp + Ratchet Bolt + Vernier Scale) -->
+  <g transform="translate(860, 200)">
+    <!-- Blueprint Tolerance Rings -->
+    <circle cx="0" cy="0" r="150" fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="6 6"/>
+    <circle cx="0" cy="0" r="120" fill="none" stroke="#334155" stroke-width="1"/>
+
+    <!-- Ratchet Outer Anvil Gear (Precision Teeth) -->
+    <path d="
+      M 0 -95 L 14 -100 L 10 -84 
+      A 90 90 0 0 1 64 -64 L 75 -75 L 72 -58
+      A 90 90 0 0 1 90 0 L 106 0 L 92 14
+      A 90 90 0 0 1 64 64 L 75 75 L 58 72
+      A 90 90 0 0 1 0 90 L 0 106 L -14 92
+      A 90 90 0 0 1 -64 64 L -75 75 L -72 58
+      A 90 90 0 0 1 -90 0 L -106 0 L -92 -14
+      A 90 90 0 0 1 -64 -64 L -75 -75 L -58 -72
+      Z" 
+      fill="#0c111a" stroke="#475569" stroke-width="2.5"/>
+
+    <!-- Central High-Tensile Hex Bolt (The Pinned Configuration) -->
+    <polygon points="0,-48 42,-24 42,24 0,48 -42,24 -42,-24" fill="#1e293b" stroke="url(#amberGlow)" stroke-width="3"/>
+    
+    <!-- Central Pivot Bore -->
+    <circle cx="0" cy="0" r="24" fill="#070a0f" stroke="#38bdf8" stroke-width="2"/>
+    <circle cx="0" cy="0" r="6" fill="#f59e0b"/>
+
+    <!-- Heavy Vise Caliper Jaws (Mechanical Compression) -->
+    <!-- Left Jaw (Fixed Anvil) -->
+    <path d="M -145 -55 L -100 -55 L -100 55 L -145 55" fill="none" stroke="url(#steelBeam)" stroke-width="8" stroke-linejoin="miter"/>
+    <line x1="-100" y1="-30" x2="-80" y2="-30" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+    <line x1="-100" y1="30" x2="-80" y2="30" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Right Jaw (Spindle Clamp with Vernier Calibration Marks) -->
+    <path d="M 145 -55 L 100 -55 L 100 55 L 145 55" fill="none" stroke="url(#steelBeam)" stroke-width="8" stroke-linejoin="miter"/>
+    <line x1="100" y1="-30" x2="80" y2="-30" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+    <line x1="100" y1="30" x2="80" y2="30" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Vernier Hash Marks on Right Spindle -->
+    <line x1="110" y1="-40" x2="110" y2="40" stroke="#475569" stroke-width="1.5"/>
+    <line x1="118" y1="-30" x2="118" y2="30" stroke="#475569" stroke-width="1"/>
+    <line x1="126" y1="-35" x2="126" y2="35" stroke="#475569" stroke-width="1.5"/>
+    <line x1="134" y1="-25" x2="134" y2="25" stroke="#475569" stroke-width="1"/>
+
+    <!-- Torque Direction Tension Arrows (Locking in Place) -->
+    <path d="M -55 -78 A 95 95 0 0 1 55 -78" fill="none" stroke="url(#amberGlow)" stroke-width="3" stroke-linecap="round"/>
+    <polygon points="55,-84 68,-76 55,-68" fill="#f59e0b"/>
+
+    <path d="M 55 78 A 95 95 0 0 1 -55 78" fill="none" stroke="url(#amberGlow)" stroke-width="3" stroke-linecap="round"/>
+    <polygon points="-55,84 -68,76 -55,68" fill="#f59e0b"/>
+
+    <!-- Compression Clamping Force Vectors (Pointing Inward) -->
+    <line x1="-130" y1="0" x2="-92" y2="0" stroke="#38bdf8" stroke-width="2.5"/>
+    <polygon points="-92,-4 -84,0 -92,4" fill="#38bdf8"/>
+
+    <line x1="130" y1="0" x2="92" y2="0" stroke="#38bdf8" stroke-width="2.5"/>
+    <polygon points="92,-4 84,0 92,4" fill="#38bdf8"/>
+
+    <!-- Status Telemetry Readouts around Mechanism -->
+    <text x="0" y="-125" text-anchor="middle" class="font-mono code-chip" fill="#38bdf8">CONFIG_PIN: SHA256_MATCH</text>
+    <text x="0" y="135" text-anchor="middle" class="font-mono badge-text" fill="#f59e0b">GATE: QUALITY_PASSED</text>
+  </g>
+
+  <!-- Bottom Terminal Status Bar -->
+  <g transform="translate(80, 345)">
+    <line x1="0" y1="0" x2="1040" y2="0" stroke="#1e293b" stroke-width="1"/>
+    <circle cx="6" cy="18" r="4" fill="#22c55e"/>
+    <text x="20" y="22" class="font-mono" font-size="11" fill="#64748b">
+      CONTRACTS: <tspan fill="#94a3b8">EvaluationConfigFingerprint.v1</tspan> | <tspan fill="#94a3b8">QualityGateArtifact.v1</tspan> | <tspan fill="#94a3b8">MetricVector.v1</tspan>
+    </text>
+    <text x="1040" y="22" text-anchor="end" class="font-mono" font-size="11" fill="#475569">
+      DETERMINISTIC • FAIL-CLOSED • REFUSE-TO-LIE
+    </text>
+  </g>
+</svg>

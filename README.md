@@ -1,3 +1,5 @@
+![ERA banner](docs/assets/era-banner.svg)
+
 # ERA
 
 Evidence Review & Assurance is a bounded internal-control subsystem for the Forge ecosystem.

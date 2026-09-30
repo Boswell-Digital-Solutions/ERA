@@ -73,7 +73,17 @@ A `QualityEfficiencyComparison.v1` cannot name `improvement` or `regression` unl
 
 `era_core/eval_comparability.py` compares two fingerprints on the required dimensions. A different value gives `incomparable`. A missing or unrecognized dimension gives `unknown`. Only a manifest can waive a dimension. `select_baseline` picks the latest comparable prior run and lists the rejected runs with reasons.
 
-These modules are not yet connected to the efficiency lane. Legacy `EfficiencyWorkloadManifest.v1` behavior is unchanged.
+## Quality Gate in the Efficiency Lane (WP03)
+
+A workload opts in with an `evaluation` block (`EfficiencyWorkloadManifest.v2`). A workload without the block keeps the v1 behavior. `era_core/eval_lane.py` builds a fingerprint, a quality gate, and a metric vector for each opted-in workload. It writes them under `evidence/efficiency/eval/<workload>/`.
+
+ERA reads quality results from a file that already exists in the target tree. A contained run discards writes to the target, so the workload command cannot create that file. A missing file gives `quality_unproven`. A misdeclared block gives `evidence_blocked`.
+
+The execution identity includes the sandbox posture (`sandbox`, `sandbox_backend`, `network`, `target_filesystem`). A contained run and an uncontained run never compare as equal.
+
+When the quality gate is not `passed`, the workload status becomes `quality_blocked`, `quality_unproven`, or `evidence_blocked`. The timing status stays visible as `timing_comparison_status`. A quality failure is never reported as a regression. The lane classification follows the same order.
+
+Baseline selection by fingerprint and the `QualityEfficiencyComparison.v1` artifact are not yet connected (WP04).
 
 ---
 

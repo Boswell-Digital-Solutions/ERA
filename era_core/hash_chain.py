@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -121,6 +122,10 @@ def build_evidence_hash_chain(
     }
     if evaluation_artifacts:
         chain["evaluation_artifacts"] = evaluation_artifacts
+        export_path = run_root / "evaluation_export.json"
+        if export_path.exists():
+            embedded = json.loads(export_path.read_text(encoding="utf-8")).get("sha256")
+            chain["evaluation_export"] = {"path": "evaluation_export.json", "sha256": embedded}
     return chain
 
 

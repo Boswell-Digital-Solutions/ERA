@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from era_core.eval_export import validate_evaluation_export
 from era_core.eval_validation import validate_eval_evidence
 from era_core.hashing import sha256_json, sha256_path
 from era_integrations.centipede_export import validate_centipede_export_bundle
@@ -438,6 +439,7 @@ def validate_run_dir(run_dir: Path) -> dict[str, object]:
                     chain=(hashes.get("evidence_hash_chain") or {}),
                 )
             )
+            errors.extend(validate_evaluation_export(run_dir, hashes.get("evidence_hash_chain") or {}))
 
     for field in (
         "target_manifest_path",

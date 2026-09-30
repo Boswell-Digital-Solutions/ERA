@@ -25,3 +25,13 @@ Findings for this repo. Each entry has a date, the problem, the root cause, the 
 **Root cause.** The check makes a stale baseline reference fail closed.
 
 **Scope.** Only runs whose workload has an `evaluation` block. Archive old run folders together with the runs that depend on them. A future work package can add a baseline snapshot inside the newer run, so the newer run does not depend on the older folder.
+
+## 2026-09-30 — No downstream consumer for evaluation evidence
+
+**Status: OPEN.**
+
+**Problem.** ERA writes `evaluation_export.json` (`ERAEvaluationExport.v1`) for runs with opted-in workloads. Nothing reads it. DataForge Local has no ERA or evaluation ingestion surface. Forge_Command shows ERA evidence only through the Centipede inbox, which takes findings and incidents, not evaluation claims.
+
+**Root cause.** The export contract is local to ERA (BDS-ERA-EVAL-v0.1 AUTHORITY_GAP-01). A consumer in another repo needs a promoted contract in `forge_contract_core`. Promotion is a separate authorization.
+
+**Scope.** ERA side is closed (export, validation, hash chain). Persistence, the review surface, and contract promotion are open and need operator decisions. See `docs/eval/BDS-ERA-EVAL-v0.1_WP12_INTERFACE.md`.

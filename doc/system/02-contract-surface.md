@@ -138,3 +138,11 @@ An `unsatisfied` receipt blocks every claim except a quality outcome. The claim 
 Validation checks that the receipt matches the fingerprint's execution identity, that its requirement matches the manifest, that its status follows from its posture, and that the comparison records the same status.
 
 Every comparison for an opted-in workload must now match on `execution.sandbox`, `execution.network`, and `execution.target_filesystem`. A contained run and an uncontained run never compare as equal (operator ruling 3).
+
+## Evaluation Export (WP12, ERA side)
+
+A run with an opted-in workload writes `evaluation_export.json` (`ERAEvaluationExport.v1`). It summarizes each workload's claim, gates, metrics, baseline, blocked reasons, and artifact hashes. It holds hashes and statuses only. It carries a fixed authority text: ERA evidence, not canonical truth. The `evidence_hash_chain` lists it as `evaluation_export`.
+
+`era_core/eval_export.py` rebuilds the export from the run folder during validation. Any difference fails the run. A run without an opted-in workload has no export.
+
+The contract is local to ERA. `consumer_contract_status` says `local_to_era`. DataForge Local persistence, a Forge_Command review surface, and promotion to `forge_contract_core` need separate decisions. See `docs/eval/BDS-ERA-EVAL-v0.1_WP12_INTERFACE.md`.

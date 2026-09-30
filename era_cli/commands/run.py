@@ -40,6 +40,7 @@ from era_core.git_info import (
     ensure_git_repo,
     resolve_baseline_commit,
 )
+from era_core.eval_export import EXPORT_FILENAME, build_evaluation_export
 from era_core.hash_chain import build_hash_manifest
 from era_core.hashing import sha256_json, write_json
 from era_core.models import CommandResult
@@ -728,6 +729,10 @@ def execute_run(
         efficiency_baseline_artifact=baseline_artifact,
         output_path=run_paths.review,
     )
+
+    evaluation_export = build_evaluation_export(run_paths.root)
+    if evaluation_export is not None:
+        write_json(run_paths.root / EXPORT_FILENAME, evaluation_export)
 
     hashes = build_hash_manifest(
         run_id=run_id,

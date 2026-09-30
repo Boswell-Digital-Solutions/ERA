@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from era_core.artifact_paths import utc_now_text
+from era_core.eval_telemetry import ENERGY_METRICS, ENERGY_SCOPES, base_metric_name
 from era_core.hashing import sha256_json
 
 FINGERPRINT_SCHEMA = "EvaluationConfigFingerprint.v1"
@@ -396,6 +397,9 @@ def validate_metric_vector(payload: dict[str, Any]) -> list[str]:
                 errors.append(f"{label} metric `{name}` needs a numeric value.")
             if entry.get("direction") not in METRIC_DIRECTIONS:
                 errors.append(f"{label} metric `{name}` needs a declared direction.")
+            if base_metric_name(name) in ENERGY_METRICS:
+                if entry.get("scope") not in ENERGY_SCOPES:
+                    errors.append(f"{label} energy metric `{name}` needs a declared measurement scope.")
     elif metrics is not None:
         errors.append(f"{label} metrics must be an object.")
     _check_hash(payload, label, errors)

@@ -57,6 +57,7 @@ from era_core.eval_telemetry import (
     summarize_telemetry,
     validate_telemetry_policy,
 )
+from era_core.eval_stats import bootstrap_median_ci
 from era_core.hashing import sha256_json, sha256_path
 from era_core.models import CommandResult
 
@@ -102,6 +103,8 @@ def validate_eval_policy(policy: dict[str, Any]) -> list[str]:
             errors.append(f"evaluation.primary_metric `{primary}` is not a declared metric.")
         elif metrics[primary] not in {"lower_is_better", "higher_is_better"}:
             errors.append("evaluation.primary_metric needs lower_is_better or higher_is_better.")
+    if "sample_policy" in policy:
+        errors.extend(validate_sample_policy(policy["sample_policy"]))
     if "telemetry_policy" in policy:
         errors.extend(validate_telemetry_policy(policy["telemetry_policy"]))
     for key in ("required_comparison_dimensions", "non_binding_dimensions"):
@@ -118,6 +121,21 @@ TELEMETRY_SENSITIVE_DIMENSIONS = (
 )
 
 
+def validate_sample_policy(sample_policy: Any) -> list[str]:
+    if not isinstance(sample_policy, dict):
+        return ["evaluation.sample_policy must be an object."]
+    errors: list[str] = []
+    warmup = sample_policy.get("warmup_iterations", 0)
+    if isinstance(warmup, bool) or not isinstance(warmup, int) or not 0 <= warmup <= 20:
+        errors.append("evaluation.sample_policy.warmup_iterations must be an integer from 0 to 20.")
+    minimum = sample_policy.get("min_samples", 0)
+    if isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 0:
+        errors.append("evaluation.sample_policy.min_samples must be a non-negative integer.")
+    if not isinstance(sample_policy.get("require_ci_separation", False), bool):
+        errors.append("evaluation.sample_policy.require_ci_separation must be true or false.")
+    return errors
+
+
 def required_dimensions(policy: dict[str, Any]) -> tuple[str, ...]:
     """Default dimensions, the manifest's own, and, for telemetry, the hardware-bound ones.
 
@@ -126,7 +144,13 @@ def required_dimensions(policy: dict[str, Any]) -> tuple[str, ...]:
     """
     declared = tuple(policy.get("required_comparison_dimensions") or ())
     telemetry = TELEMETRY_SENSITIVE_DIMENSIONS if "telemetry_policy" in policy else ()
-    return tuple(dict.fromkeys(DEFAULT_REQUIRED_DIMENSIONS + telemetry + declared))
+    energy = ("execution.energy_scope",) if (policy.get("telemetry_policy") or {}).get("energy_scope") else ()
+    return tuple(dict.fromkeys(DEFAULT_REQUIRED_DIMENSIONS + telemetry + energy + declared))
+
+
+def sample_policy(policy: dict[str, Any]) -> dict[str, Any]:
+    value = policy.get("sample_policy")
+    return value if isinstance(value, dict) else {}
 
 
 def primary_metric(policy: dict[str, Any]) -> str:
@@ -192,8 +216,10 @@ def build_workload_eval_evidence(
         "command_digest": sha256_json(command),
         **(policy.get("subject_identity") or {}),
     }
+    energy_scope = (policy.get("telemetry_policy") or {}).get("energy_scope")
     execution_identity = {
         **(policy.get("execution_identity") or {}),
+        **({"energy_scope": energy_scope} if energy_scope else {}),
         **{key: execution_posture.get(key) for key in POSTURE_KEYS if key in execution_posture},
     }
     fingerprint = build_config_fingerprint(
@@ -237,11 +263,15 @@ def build_workload_eval_evidence(
         per_metric_samples: dict[str, int] = {}
         refs = [f"{command_result.command_id}:stdout", f"{command_result.command_id}:stderr"]
         scopes = ["wall_clock_internal_timer"]
+        uncertainty: dict[str, Any] = {}
         if "median_ms" in summary and "median_ms" in directions:
-            iterations = len(lane_metadata.get("iteration_durations_ms") or [])
+            durations = [float(v) for v in lane_metadata.get("iteration_durations_ms") or []]
             metrics["median_ms"] = {"value": summary["median_ms"], "unit": "ms", "direction": directions["median_ms"]}
             per_metric_variance["median_ms"] = lane_metadata.get("variance_classification")
-            per_metric_samples["median_ms"] = iterations
+            per_metric_samples["median_ms"] = len(durations)
+            uncertainty["median_ms"] = bootstrap_median_ci(durations) or {
+                "omitted": f"{len(durations)} samples is below the minimum for an interval."
+            }
         telemetry_policy = policy.get("telemetry_policy")
         if telemetry_policy:
             payload, digest, read_problems = read_telemetry(
@@ -253,6 +283,7 @@ def build_workload_eval_evidence(
                 metrics.update(summarized["metrics"])
                 per_metric_variance.update(summarized["per_metric_variance"])
                 per_metric_samples.update(summarized["per_metric_sample_count"])
+                uncertainty.update(summarized["uncertainty"])
                 evidence["telemetry_problems"] += summarized["problems"]
                 evidence["telemetry_notes"] = summarized["notes"]
                 refs.append(f"telemetry_results:{telemetry_policy['telemetry_results_path']}:sha256:{digest}")
@@ -267,6 +298,8 @@ def build_workload_eval_evidence(
                     "stdev_ms": summary.get("stdev_ms"),
                     "per_metric": per_metric_variance,
                     "per_metric_sample_count": per_metric_samples,
+                    "uncertainty": uncertainty,
+                    "warmup_iterations": lane_metadata.get("warmup_iterations", 0),
                 },
                 measurement_scope="+".join(dict.fromkeys(scopes)),
                 raw_evidence_refs=refs,
@@ -353,6 +386,8 @@ def resolve_comparisons(
             regression_threshold_pct=float(workload.get("regression_threshold_pct", 10.0)),
             improvement_threshold_pct=float(workload.get("improvement_threshold_pct", 10.0)),
             primary_metric=primary_metric(policy),
+            min_samples=int(sample_policy(policy).get("min_samples", 0)),
+            require_ci_separation=bool(sample_policy(policy).get("require_ci_separation", False)),
         )
         comparisons[workload_id] = build_comparison_artifact(
             run_id=run_id,

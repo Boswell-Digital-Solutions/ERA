@@ -35,6 +35,7 @@ import statistics
 from pathlib import Path
 from typing import Any
 
+from era_core.eval_stats import MIN_SAMPLES_FOR_CI, bootstrap_median_ci
 from era_core.hashing import sha256_path
 
 TELEMETRY_SCHEMA = "InferenceTelemetry.v1"
@@ -50,6 +51,17 @@ KNOWN_METRICS: dict[str, str] = {
     "vram_mb": "MB",
     "context_tokens": "tokens",
     "output_tokens": "tokens",
+    "energy_joules": "J",
+    "energy_per_token_j": "J/token",
+    "tasks_per_joule": "tasks/J",
+}
+ENERGY_METRICS = frozenset({"energy_joules", "energy_per_token_j", "tasks_per_joule"})
+# What the counter observed. ERA labels every energy metric with its scope and never
+# turns a narrow scope into a claim about wall power.
+ENERGY_SCOPES = {
+    "gpu_counter_only": "GPU counter only. Not wall power.",
+    "cpu_package": "CPU package counter. Not wall power.",
+    "system_wall": "Wall power at the system.",
 }
 DEFAULT_P95_MIN_SAMPLES = 20
 DEFAULT_P99_MIN_SAMPLES = 100
@@ -92,6 +104,8 @@ def validate_telemetry_policy(policy: Any) -> list[str]:
     percentile_metrics = policy.get("percentile_metrics", [])
     if not isinstance(percentile_metrics, list) or any(name not in KNOWN_METRICS for name in percentile_metrics):
         errors.append("evaluation.telemetry_policy.percentile_metrics must name known metrics.")
+    if "energy_scope" in policy and policy["energy_scope"] not in ENERGY_SCOPES:
+        errors.append(f"evaluation.telemetry_policy.energy_scope must be one of {sorted(ENERGY_SCOPES)}.")
     for key in ("p95_min_samples", "p99_min_samples"):
         value = policy.get(key, 1)
         if not isinstance(value, int) or isinstance(value, bool) or value < 1:
@@ -144,11 +158,26 @@ def summarize_telemetry(
     metrics: dict[str, dict[str, Any]] = {}
     per_metric_variance: dict[str, str] = {}
     per_metric_samples: dict[str, int] = {}
+    uncertainty: dict[str, Any] = {}
     problems: list[str] = []
     notes: list[str] = []
+    declared_scope = telemetry_policy.get("energy_scope")
+    reported = payload.get("energy") if isinstance(payload.get("energy"), dict) else {}
+    scope_problem = None
+    if any(name in ENERGY_METRICS for name in directions):
+        if declared_scope not in ENERGY_SCOPES:
+            scope_problem = "Energy metrics need telemetry_policy.energy_scope."
+        elif reported.get("scope") != declared_scope:
+            scope_problem = (
+                f"Energy scope mismatch: manifest declares `{declared_scope}`, "
+                f"telemetry reports `{reported.get('scope')}`."
+            )
 
     for name in sorted(KNOWN_METRICS):
         if name not in directions:
+            continue
+        if name in ENERGY_METRICS and scope_problem:
+            problems.append(f"Energy metric `{name}` left out. {scope_problem}")
             continue
         if name not in samples:
             problems.append(f"Declared metric `{name}` has no samples in the telemetry file.")
@@ -165,6 +194,11 @@ def summarize_telemetry(
             "direction": directions[name],
             "aggregation": "median",
             "sample_count": len(ordered),
+            **({"scope": declared_scope} if name in ENERGY_METRICS else {}),
+        }
+        interval = bootstrap_median_ci(values)
+        uncertainty[name] = interval or {
+            "omitted": f"{len(ordered)} samples is below the minimum {MIN_SAMPLES_FOR_CI} for an interval."
         }
         per_metric_variance[name] = variance_class(values)
         per_metric_samples[name] = len(ordered)
@@ -181,6 +215,7 @@ def summarize_telemetry(
                 "direction": directions.get(label, directions[name]),
                 "aggregation": f"p{p}",
                 "sample_count": len(ordered),
+                **({"scope": declared_scope} if name in ENERGY_METRICS else {}),
             }
             per_metric_variance[label] = per_metric_variance[name]
             per_metric_samples[label] = len(ordered)
@@ -188,6 +223,7 @@ def summarize_telemetry(
         "metrics": metrics,
         "per_metric_variance": per_metric_variance,
         "per_metric_sample_count": per_metric_samples,
+        "uncertainty": uncertainty,
         "problems": problems,
         "notes": notes,
     }

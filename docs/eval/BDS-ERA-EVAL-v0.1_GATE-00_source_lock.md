@@ -94,3 +94,24 @@ Stop conditions: any need to edit a file outside the allowlist; any contradictio
 ## Next authorization needed
 
 Approve CP1 (WP01 to WP02) with the allowlist above. Confirm whether docs are in scope.
+
+## Addendum 1 — head moved (2026-09-30)
+
+PR #5 (Slice 03, contained execution sandbox) merged after the first lock. GATE-00 is re-checked against the new head.
+
+| Item | Value |
+|---|---|
+| New head (`origin/master`) | `7eac6716058d327055774cd65e2d8530d0b4883c` |
+| Files changed since `13180a8` | `README.md`, `era_cli/commands/run.py`, `era_core/command_runner.py`, new `era_core/sandbox.py`, new `tests/test_sandbox.py` |
+| Test baseline | 47 tests on master (87 with WP01 and WP02) |
+| Doc parity | `BUILD.sh` leaves the tree clean |
+
+New blobs: `README.md` `b69b7db0f32555abd74a0ca594e10299a5152021`, `era_cli/commands/run.py` `d16f63fc6b09cc192ca40cc0db188b99e55d5702`, `era_core/command_runner.py` `dc34a51c3834a36afb796202934085a30691f179`.
+
+**Result: GATE-00 still passes.** The change does not touch the efficiency lane, the baseline logic, or any WP01 and WP02 file. The rebase was clean. Three plan statements are now out of date:
+
+1. **AUTHORITY_GAP-02 is partly closed.** ERA now has a contained backend: no network, and the target repo behind an overlay. Section 02 says "ERA currently has no sandbox". Section 02 also says ERA "does not own the sandbox". The sandbox lives inside ERA. The operator must rule whether `era_core/sandbox.py` counts as the "authorized isolation provider" for D5. Until then, treat agentic and untrusted workloads as still held (WP11).
+2. **The trust gate changed.** `--trusted-target` is now needed only when containment is unavailable or off. Plan case N19 ("untrusted target without attestation refuses") must read: refuses when there is neither containment nor attestation. Ruling 9 and the non-goal "do not weaken --trusted-target" still hold, because the gate fails closed in both paths.
+3. **Disclosed limit.** A contained run can still read other host paths. It is not a full jail.
+
+Effect on CP1: none. CP2 must read `execution_posture` (`sandbox`, `network`, `target_filesystem`) when it binds fingerprints, because a contained run has no network. A non-hermetic workload fails in a contained run by design. Record the posture in the execution identity at WP03.

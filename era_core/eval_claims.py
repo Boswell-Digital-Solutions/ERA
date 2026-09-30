@@ -223,7 +223,7 @@ def decide_claim(
     candidate_metric = vector["metrics"].get(primary_metric)
     baseline_metric = baseline_vector["metrics"].get(primary_metric)
     if candidate_metric is None or baseline_metric is None:
-        reasons = [f"Metric `{primary_metric}` is missing from a metric vector."] + candidate.get("telemetry_problems", [])
+        reasons = [f"Metric `{primary_metric}` is missing from a metric vector."] + candidate.get("telemetry_problems", []) + candidate.get("agent_problems", [])
         return block("evidence_blocked", reasons)
     direction = candidate_metric["direction"]
     if direction != baseline_metric["direction"]:

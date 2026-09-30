@@ -161,6 +161,25 @@ A judge metric counts toward the quality gate only when the audit passed. Otherw
 
 The artifact has `authority: evidence_only`. The validator rejects any other value. Validation also recomputes the audit status from its numbers, so a forged `passed` fails. The hash chain and the review include the audit.
 
+## Agent Efficiency (WP10)
+
+ERA does not run an agent. An external harness runs the tasks and writes an `AgentRunEvidence.v1` file into the target tree. Each task has `success`, `steps`, `tool_calls`, `input_tokens`, `output_tokens`, `wall_time_ms`, and optionally `api_cost_usd` and `energy_joules`. A workload names the file in `evaluation.agent_policy.agent_evidence_path`.
+
+An agent workload uses `subject_kind: "agent"`. Its `subject_identity` must name `agent_revision`, `model_lane`, `tool_policy_hash`, `prompt_program_hash`, `step_budget`, and `token_budget`. These fields, plus hardware, concurrency, and batch size, are required comparison dimensions. A different tool policy is incomparable.
+
+`era_core/eval_agent.py` writes these metrics into the vector. Only declared metrics appear. A metric with missing inputs is left out and the review names the problem.
+
+| Metric | Meaning |
+|---|---|
+| `task_success_rate` | successes divided by tasks. Also merged into the quality gate results, so a floor on it applies. |
+| `steps_per_task`, `tool_calls_per_task`, `tokens_per_task`, `wall_time_ms_per_task` | median over all tasks |
+| `api_cost_usd_per_successful_task` | total cost of all tasks divided by the number of successes. Failed tasks still cost money. Needs a cost on every task. |
+| `joules_per_successful_task` | total energy divided by the number of successes. Needs energy on every task and a matching declared `energy_scope`. |
+
+The success rate has a Wilson interval. The other medians have a bootstrap interval. The ratio metrics have a bootstrap interval that resamples whole tasks. Task-to-task spread is not measurement noise, so agent metrics are marked `task_level` and stability rests on `min_samples` and interval separation.
+
+An agent that is cheaper because it fails gets `quality_blocked`. Quality is checked before efficiency. ERA reports each metric on its own row and computes no promotion score.
+
 ---
 
             # Runtime Boundary

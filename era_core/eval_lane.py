@@ -57,6 +57,14 @@ from era_core.eval_telemetry import (
     summarize_telemetry,
     validate_telemetry_policy,
 )
+from era_core.eval_agent import (
+    AGENT_SUBJECT_FIELDS,
+    SUCCESS_METRIC,
+    read_agent_evidence,
+    summarize_agent,
+    validate_agent_policy,
+    validate_agent_subject,
+)
 from era_core.eval_judge import (
     build_judge_audit,
     read_judge_evidence,
@@ -117,6 +125,10 @@ def validate_eval_policy(policy: dict[str, Any]) -> list[str]:
             errors.append(f"evaluation.primary_metric `{primary}` is not a declared metric.")
         elif metrics[primary] not in {"lower_is_better", "higher_is_better"}:
             errors.append("evaluation.primary_metric needs lower_is_better or higher_is_better.")
+    if policy.get("subject_kind") == "agent":
+        errors.extend(validate_agent_subject(policy.get("subject_identity")))
+    if "agent_policy" in policy:
+        errors.extend(validate_agent_policy(policy["agent_policy"], policy.get("subject_kind"), policy.get("subject_identity")))
     if "sample_policy" in policy:
         errors.extend(validate_sample_policy(policy["sample_policy"]))
     if "telemetry_policy" in policy:
@@ -158,8 +170,16 @@ def required_dimensions(policy: dict[str, Any]) -> tuple[str, ...]:
     """
     declared = tuple(policy.get("required_comparison_dimensions") or ())
     telemetry = TELEMETRY_SENSITIVE_DIMENSIONS if "telemetry_policy" in policy else ()
-    energy = ("execution.energy_scope",) if (policy.get("telemetry_policy") or {}).get("energy_scope") else ()
-    return tuple(dict.fromkeys(DEFAULT_REQUIRED_DIMENSIONS + telemetry + energy + declared))
+    scope_declared = (policy.get("telemetry_policy") or {}).get("energy_scope") or (
+        policy.get("agent_policy") or {}
+    ).get("energy_scope")
+    energy = ("execution.energy_scope",) if scope_declared else ()
+    agent = (
+        tuple(f"subject.{field}" for field in AGENT_SUBJECT_FIELDS) + TELEMETRY_SENSITIVE_DIMENSIONS
+        if policy.get("subject_kind") == "agent"
+        else ()
+    )
+    return tuple(dict.fromkeys(DEFAULT_REQUIRED_DIMENSIONS + telemetry + agent + energy + declared))
 
 
 def sample_policy(policy: dict[str, Any]) -> dict[str, Any]:
@@ -221,6 +241,7 @@ def build_workload_eval_evidence(
         "problems": problems,
         "telemetry_problems": [],
         "telemetry_notes": [],
+        "agent_problems": [],
     }
     if problems:
         return evidence
@@ -231,7 +252,9 @@ def build_workload_eval_evidence(
         "command_digest": sha256_json(command),
         **(policy.get("subject_identity") or {}),
     }
-    energy_scope = (policy.get("telemetry_policy") or {}).get("energy_scope")
+    energy_scope = (policy.get("telemetry_policy") or {}).get("energy_scope") or (
+        policy.get("agent_policy") or {}
+    ).get("energy_scope")
     execution_identity = {
         **(policy.get("execution_identity") or {}),
         **({"energy_scope": energy_scope} if energy_scope else {}),
@@ -254,6 +277,24 @@ def build_workload_eval_evidence(
     results, count, refs, _, read_problems = _read_quality_results(
         repo_path, workload.get("cwd_subpath", "."), gate_policy["quality_results_path"]
     )
+    agent_summary = None
+    agent_ref = None
+    agent_policy = policy.get("agent_policy")
+    if agent_policy:
+        agent_payload, agent_digest, agent_read_problems = read_agent_evidence(
+            repo_path, workload.get("cwd_subpath", "."), agent_policy["agent_evidence_path"]
+        )
+        evidence["agent_problems"] = list(agent_read_problems)
+        if agent_payload is not None:
+            agent_summary = summarize_agent(agent_payload, policy["metrics"], agent_policy)
+            agent_summary["measurement_scope"] = agent_payload["measurement_scope"]
+            evidence["agent_problems"] += agent_summary["problems"]
+            if agent_summary["success_rate"] is not None:
+                # The success rate comes from the hashed agent evidence, so the harness cannot restate it.
+                results[SUCCESS_METRIC] = agent_summary["success_rate"]
+                count = count or agent_summary["task_count"]
+            agent_ref = f"agent_evidence:{agent_policy['agent_evidence_path']}:sha256:{agent_digest}"
+            refs.append(agent_ref)
     judge_policy = gate_policy.get("judge_policy")
     if judge_policy:
         judge_evidence, judge_digest, judge_problems = read_judge_evidence(
@@ -325,6 +366,13 @@ def build_workload_eval_evidence(
                 evidence["telemetry_notes"] = summarized["notes"]
                 refs.append(f"telemetry_results:{telemetry_policy['telemetry_results_path']}:sha256:{digest}")
                 scopes.append(payload["measurement_scope"])
+        if agent_summary is not None:
+            metrics.update(agent_summary["metrics"])
+            per_metric_variance.update(agent_summary["per_metric_variance"])
+            per_metric_samples.update(agent_summary["per_metric_sample_count"])
+            uncertainty.update(agent_summary["uncertainty"])
+            refs.append(agent_ref)
+            scopes.append(agent_summary["measurement_scope"])
         if metrics:
             evidence["metric_vector"] = build_metric_vector(
                 fingerprint=fingerprint,

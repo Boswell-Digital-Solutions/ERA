@@ -260,6 +260,7 @@ def _write_eval_evidence(
             "problems": evidence["problems"],
             "telemetry_problems": evidence.get("telemetry_problems", []),
             "telemetry_notes": evidence.get("telemetry_notes", []),
+            "agent_problems": evidence.get("agent_problems", []),
         }
         artifacts = {**evidence, "comparison": eval_comparisons.get(workload_id)}
         for key in ("fingerprint", "quality_gate", "metric_vector", "judge_audit", "comparison"):

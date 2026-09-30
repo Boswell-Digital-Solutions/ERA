@@ -1,7 +1,7 @@
 # BDS-ERA-EVAL-v0.1 — Amendment 01 (draft for operator placement)
 
 Date: 2026-09-30
-Status: draft. The Drive plan set is unchanged. The operator places this file in `/Forge/Plans/BDS-ERA-EVAL-v0.1` and updates the plan set index and compiled plan.
+Status: draft. The operator placed a copy in `/Forge/Plans/BDS-ERA-EVAL-v0.1`. The plan set index and compiled plan are not yet updated.
 Basis: operator rulings of 2026-09-30 during implementation of CP1 to CP4.
 
 ## A1. claim_status vocabulary (sections 04 and 06)
@@ -32,11 +32,17 @@ If comparable prior runs exist and all fail qualification, the claim is `no_base
 
 Test cases N21 and N22 cover this rule.
 
-## A3. Execution isolation (section 02, AUTHORITY_GAP-02)
+## A3. Execution isolation (section 02, AUTHORITY_GAP-02, decision D5)
 
-PR #5 added a contained execution backend in `era_core/sandbox.py` (no network, overlay-protected target). Section 02 says ERA has no sandbox. That statement is out of date.
+PR #5 added a contained execution backend in `era_core/sandbox.py` (no network, overlay-protected target). Section 02 said ERA has no sandbox. That statement was out of date.
 
-Operator ruling 2 is open. It decides whether `sandbox.py` is the "authorized isolation provider" for decision D5. Until the ruling, the backend is a factual ERA capability only. Agentic and untrusted workloads stay held (WP11). A contained run can still read other host paths.
+**Operator ruling 2 (2026-09-30): yes.** `era_core/sandbox.py` is the authorized isolation provider for decision D5. AUTHORITY_GAP-02 is closed for that provider.
+
+Limits that stay in force:
+
+- A contained run is not a full jail. It can still read other host paths.
+- A run counts as isolated only when its receipt says `sandbox: contained`. A run with `sandbox: none` is a trusted-target run.
+- Section 02 said "ERA does not own the sandbox". That sentence is replaced: the sandbox lives in ERA, and ERA records the receipt for it (WP11).
 
 ## A4. Trust gate wording (section 07, case N19)
 

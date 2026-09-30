@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from era_core.eval_claims import COMPARISON_STATUS_BY_CLAIM, PRIMARY_METRIC, _prior_problems
+from era_core.eval_claims import COMPARISON_STATUS_BY_CLAIM, PRIMARY_METRIC
 from era_core.eval_comparability import compare_fingerprints
 from era_core.eval_contracts import (
     check_evidence_linkage,
@@ -26,7 +26,8 @@ from era_core.eval_isolation import POSTURE_KEYS, isolation_requirement, validat
 from era_core.eval_judge import validate_judge_audit
 from era_core.eval_lane import eval_policy, required_dimensions, workload_dirname
 from era_core.eval_review import EVAL_KINDS
-from era_core.hashing import sha256_path
+from era_core.eval_snapshot import validate_baseline_snapshot
+from era_core.hashing import sha256_json, sha256_path
 
 _VALIDATORS = {
     "fingerprint": validate_config_fingerprint,
@@ -34,6 +35,7 @@ _VALIDATORS = {
     "metric_vector": validate_metric_vector,
     "judge_audit": validate_judge_audit,
     "isolation_receipt": validate_isolation_receipt,
+    "baseline_snapshot": validate_baseline_snapshot,
     "comparison": validate_quality_efficiency_comparison,
 }
 
@@ -205,6 +207,8 @@ def _check_completeness(
         errors.append(f"{label}: isolation_receipt artifact is missing.")
     if judge_required and entry.get("quality_status") != "invalid" and "judge_audit" not in loaded:
         errors.append(f"{label}: judge_audit artifact is missing.")
+    if loaded["comparison"].get("baseline_run_id") and "baseline_snapshot" not in loaded:
+        errors.append(f"{label}: baseline_snapshot artifact is missing.")
     if claim in {"permitted", "no_claim_unstable"} and "metric_vector" not in loaded:
         errors.append(f"{label}: metric_vector artifact is missing for claim `{claim}`.")
     if claim not in {"evidence_blocked"} and entry.get("quality_status") == "invalid":
@@ -276,34 +280,45 @@ def _check_baseline_reference(
     loaded: dict[str, dict[str, Any]],
     comparison: dict[str, Any],
 ) -> list[str]:
-    """A recorded baseline must still exist, validate, and match the candidate."""
+    """The recorded baseline must be proven by the run's own snapshot.
+
+    The baseline run folder is not needed. When it still exists it must agree with
+    the snapshot, so a forger cannot edit the folder and keep a passing snapshot.
+    """
     baseline_run = comparison["baseline_run_id"]
-    directory = run_dir.parent / baseline_run / "evidence" / "efficiency" / "eval" / workload_dirname(workload_id)
-    prior = {
-        "run_id": baseline_run,
-        "fingerprint": _load(directory / "fingerprint.json"),
-        "quality_gate": _load(directory / "quality_gate.json"),
-        "metric_vector": _load(directory / "metric_vector.json"),
-    }
-    if prior["fingerprint"] is None:
-        return [f"baseline run {baseline_run} is missing or stale (no fingerprint)."]
-    problems = _prior_problems(prior)
-    if problems:
-        return [f"baseline run {baseline_run}: {item}" for item in problems]
+    snapshot = loaded.get("baseline_snapshot")
+    if snapshot is None:
+        return [f"baseline run {baseline_run} has no baseline snapshot in this run."]
     errors: list[str] = []
-    if prior["fingerprint"]["fingerprint_id"] != comparison.get("baseline_fingerprint_id"):
+    if snapshot["baseline_run_id"] != baseline_run:
+        errors.append(f"baseline snapshot is for run {snapshot['baseline_run_id']}, not {baseline_run}.")
+    if snapshot["baseline_fingerprint_id"] != comparison.get("baseline_fingerprint_id"):
         errors.append(f"baseline run {baseline_run} has a different fingerprint than the comparison records.")
-    if prior["quality_gate"]["gate_status"] != "passed":
+    if snapshot["baseline_quality_status"] != "passed":
         errors.append(f"baseline run {baseline_run} did not pass its quality gate.")
     candidate = loaded.get("fingerprint")
+    if candidate is not None and snapshot.get("candidate_fingerprint_id") != candidate.get("fingerprint_id"):
+        errors.append("baseline snapshot belongs to a different candidate fingerprint.")
     if candidate is not None:
         policy = eval_policy(workload) or {}
         match = compare_fingerprints(
             candidate,
-            prior["fingerprint"],
+            snapshot["fingerprint"],
             required_dimensions(policy),
             tuple(policy.get("non_binding_dimensions") or ()),
         )
         if match["comparability_status"] != "comparable":
             errors.append(f"baseline run {baseline_run} is not comparable: " + " ".join(match["blocked_reasons"]))
+    delta = (comparison.get("metric_deltas") or {}).get(comparison.get("primary_metric", PRIMARY_METRIC))
+    baseline_metric = (snapshot["metric_vector"].get("metrics") or {}).get(comparison.get("primary_metric", PRIMARY_METRIC))
+    if delta is not None and baseline_metric is not None and delta.get("baseline") != baseline_metric.get("value"):
+        errors.append("comparison baseline value does not match the baseline snapshot.")
+
+    directory = run_dir.parent / baseline_run / "evidence" / "efficiency" / "eval" / workload_dirname(workload_id)
+    for name in ("fingerprint", "quality_gate", "metric_vector"):
+        original = _load(directory / f"{name}.json")
+        # Compare the recomputed hash. An edit that keeps the old embedded hash still differs.
+        actual = sha256_json({k: v for k, v in (original or {}).items() if k != "sha256"}) if original else None
+        if original is not None and actual != snapshot["part_hashes"].get(name):
+            errors.append(f"baseline run folder {baseline_run} differs from the baseline snapshot ({name}).")
     return errors

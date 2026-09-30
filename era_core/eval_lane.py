@@ -78,6 +78,7 @@ from era_core.eval_judge import (
     validate_judge_audit,
     validate_judge_policy,
 )
+from era_core.eval_snapshot import build_baseline_snapshot
 from era_core.eval_stats import bootstrap_median_ci
 from era_core.hashing import sha256_json, sha256_path
 from era_core.models import CommandResult
@@ -248,6 +249,7 @@ def build_workload_eval_evidence(
         "quality_status": "invalid",
         "judge_audit": None,
         "isolation_receipt": None,
+        "baseline_snapshot": None,
         "problems": problems,
         "telemetry_problems": [],
         "telemetry_notes": [],
@@ -496,6 +498,10 @@ def resolve_comparisons(
             require_ci_separation=bool(sample_policy(policy).get("require_ci_separation", False)),
             isolation_status=(candidate.get("isolation_receipt") or {}).get("status", "not_required"),
         )
+        if selection["baseline"] is not None:
+            candidate["baseline_snapshot"] = build_baseline_snapshot(
+                candidate_fingerprint=candidate["fingerprint"], baseline=selection["baseline"]
+            )
         comparisons[workload_id] = build_comparison_artifact(
             run_id=run_id,
             workload_id=workload_id,

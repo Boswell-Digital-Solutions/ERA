@@ -79,7 +79,11 @@ class IntactEvidenceTests(ValidationBase):
         chain = json.loads((second / "hashes.json").read_text(encoding="utf-8"))["evidence_hash_chain"]
         kinds = {(item["workload_id"], item["kind"]) for item in chain["evaluation_artifacts"]}
         self.assertEqual(
-            kinds, {("eval_probe", k) for k in ("fingerprint", "quality_gate", "metric_vector", "isolation_receipt", "comparison")}
+            kinds,
+            {
+                ("eval_probe", k)
+                for k in ("fingerprint", "quality_gate", "metric_vector", "isolation_receipt", "baseline_snapshot", "comparison")
+            },
         )
 
 
@@ -178,12 +182,44 @@ class MissingArtifactTests(ValidationBase):
 
 
 class BaselineReferenceTests(ValidationBase):
-    def test_deleted_baseline_run_is_a_stale_reference(self) -> None:
+    def test_archiving_the_baseline_run_does_not_break_the_newer_run(self) -> None:  # operator decision 4
         first, second = self.make_runs()
-        if self.read(second, "comparison.json")["baseline_run_id"] is None:
-            self.skipTest("no baseline selected")
+        comparison = self.read(second, "comparison.json")
+        self.assertEqual(comparison["baseline_run_id"], first.name)
         shutil.rmtree(first)
-        self.assertBlocked(second, "missing or stale")
+        result = validate_run_dir(second)
+        self.assertTrue(result["ok"], msg="\n".join(result["errors"]))
+
+    def test_a_missing_snapshot_for_a_recorded_baseline_fails(self) -> None:
+        _, second = self.make_runs()
+        (second / EVAL / "baseline_snapshot.json").unlink()
+        refresh_entries(second)
+        self.assertBlocked(second, "baseline_snapshot")
+
+    def test_a_forged_snapshot_is_caught(self) -> None:
+        first, second = self.make_runs()
+        snapshot = self.read(second, "baseline_snapshot.json")
+        snapshot["metric_vector"]["metrics"]["median_ms"]["value"] = 1.0
+        snapshot["sha256"] = "0" * 64
+        write_json(second / EVAL / "baseline_snapshot.json", reseal(snapshot))
+        refresh_entries(second)
+        self.assertFalse(validate_run_dir(second)["ok"])
+
+    def test_a_snapshot_that_differs_from_a_surviving_baseline_folder_fails(self) -> None:
+        first, second = self.make_runs()
+        vector = self.read(first, "metric_vector.json")
+        vector["metrics"]["median_ms"]["value"] = 999.0
+        write_json(first / EVAL / "metric_vector.json", reseal(vector))
+        self.assertBlocked(second, "differs from the baseline snapshot")
+
+    def test_reconstruction_works_from_the_snapshot_after_archiving(self) -> None:
+        from era_core.eval_reconstruct import compare_to_stored
+
+        first, second = self.make_runs()
+        shutil.rmtree(first)
+        result = compare_to_stored(second, "eval_probe", from_snapshot=True)
+        self.assertTrue(result["match"], msg=result["differences"])
+        self.assertIsNotNone(result["reconstructed"]["baseline_run_id"])
 
     def test_tampered_baseline_fingerprint_fails(self) -> None:
         first, second = self.make_runs()

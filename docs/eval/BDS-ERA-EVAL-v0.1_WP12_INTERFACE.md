@@ -32,6 +32,7 @@ The export summarizes files that already exist in the run folder.
 | `workloads[].fingerprint_id`, `config_digest`, `baseline_run_id`, `baseline_fingerprint_id` | identity and baseline |
 | `workloads[].blocked_reasons`, `baseline_rejection_reasons` | why no claim, and why runs were rejected as baselines |
 | `workloads[].judge_audit_status` | the judge audit status, when a judge policy exists |
+| `workloads[].baseline` | the baseline snapshot summary: run, fingerprint, quality status, metrics, part hashes, snapshot digest |
 | `workloads[].artifacts` | path and hash of each evaluation artifact |
 | `authority` | fixed text: ERA evidence only, not canonical truth |
 | `consumer_contract_status` | `local_to_era`. It says the contract is not promoted. |

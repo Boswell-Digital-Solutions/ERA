@@ -144,6 +144,23 @@ A workload can set `evaluation.sample_policy`:
 
 Energy metrics are `energy_joules`, `energy_per_token_j`, and `tasks_per_joule`. The manifest must declare `telemetry_policy.energy_scope`: `gpu_counter_only`, `cpu_package`, or `system_wall`. The telemetry file must report the same scope. A missing or different scope leaves the energy metrics out and the review names the problem. Every energy metric carries its scope, and the review prints the scope label. `gpu_counter_only` and `cpu_package` are labelled "Not wall power". A comparison must match on `execution.energy_scope`, so a GPU counter is never compared with a wall meter.
 
+## Judge Audit (WP09)
+
+ERA never calls a judge. An external harness writes a `JudgeEvidence.v1` file into the target tree. Each item has the verdict from both presentation orders (`winner_ab`, `winner_ba`, mapped back to `candidate`, `baseline`, or `tie`). Some items also carry a `human_label`. That subset is the calibration set.
+
+A workload lists judge-derived metrics in `quality_gate_policy.judge_policy.judge_metrics`. Each one needs a quality floor. `era_core/eval_judge.py` writes a `JudgeAuditArtifact.v1` with:
+
+- position consistency: the share of paired items where both orders give the same verdict;
+- human agreement and Cohen's kappa on the calibration set (an inconsistent judge verdict counts as a miss);
+- family separation: the judge model family must differ from the subject family;
+- every disagreement (position flips, human disagreements, unpaired items), listed and never averaged away. The list stops at 50 entries and the total stays exact.
+
+The status is `passed`, `failed`, `unproven`, or `invalid`. Too few items or labels, or an unknown family, give `unproven`. A missed threshold or a shared family gives `failed`.
+
+A judge metric counts toward the quality gate only when the audit passed. Otherwise ERA removes it from the results and the gate is `unproven`, with the reason named. A hard floor that fails still gives `failed`. A high judge score cannot offset a failed hard floor.
+
+The artifact has `authority: evidence_only`. The validator rejects any other value. Validation also recomputes the audit status from its numbers, so a forged `passed` fails. The hash chain and the review include the audit.
+
 ---
 
             # Runtime Boundary

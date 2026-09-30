@@ -57,6 +57,13 @@ from era_core.eval_telemetry import (
     summarize_telemetry,
     validate_telemetry_policy,
 )
+from era_core.eval_judge import (
+    build_judge_audit,
+    read_judge_evidence,
+    thresholds_from,
+    validate_judge_audit,
+    validate_judge_policy,
+)
 from era_core.eval_stats import bootstrap_median_ci
 from era_core.hashing import sha256_json, sha256_path
 from era_core.models import CommandResult
@@ -90,6 +97,13 @@ def validate_eval_policy(policy: dict[str, Any]) -> list[str]:
         errors.append("evaluation.quality_gate_policy needs quality_floors.")
     elif not isinstance(gate_policy.get("quality_results_path"), str):
         errors.append("evaluation.quality_gate_policy needs quality_results_path.")
+    if isinstance(gate_policy, dict) and "judge_policy" in gate_policy:
+        judge_errors = validate_judge_policy(gate_policy["judge_policy"])
+        errors.extend(judge_errors)
+        if not judge_errors:
+            for name in gate_policy["judge_policy"]["judge_metrics"]:
+                if name not in (gate_policy.get("quality_floors") or {}):
+                    errors.append(f"judge metric `{name}` has no quality floor.")
     metrics = policy.get("metrics")
     if not isinstance(metrics, dict) or not metrics:
         errors.append("evaluation.metrics must declare at least one metric direction.")
@@ -203,6 +217,7 @@ def build_workload_eval_evidence(
         "quality_gate": None,
         "metric_vector": None,
         "quality_status": "invalid",
+        "judge_audit": None,
         "problems": problems,
         "telemetry_problems": [],
         "telemetry_notes": [],
@@ -239,6 +254,28 @@ def build_workload_eval_evidence(
     results, count, refs, _, read_problems = _read_quality_results(
         repo_path, workload.get("cwd_subpath", "."), gate_policy["quality_results_path"]
     )
+    judge_policy = gate_policy.get("judge_policy")
+    if judge_policy:
+        judge_evidence, judge_digest, judge_problems = read_judge_evidence(
+            repo_path, workload.get("cwd_subpath", "."), judge_policy["judge_evidence_path"]
+        )
+        audit = build_judge_audit(
+            fingerprint=fingerprint,
+            evidence=judge_evidence,
+            read_problems=judge_problems,
+            thresholds=thresholds_from(judge_policy),
+            judge_metrics=list(judge_policy["judge_metrics"]),
+            raw_evidence_refs=[f"judge_evidence:{judge_policy['judge_evidence_path']}:sha256:{judge_digest}"]
+            if judge_digest
+            else [],
+        )
+        evidence["judge_audit"] = audit
+        if audit["audit_status"] != "passed":
+            # A judge metric counts only after a passed audit. Without one the floor has no result.
+            for name in judge_policy["judge_metrics"]:
+                if name in results:
+                    del results[name]
+                read_problems.append(f"Judge metric `{name}` not admitted: the judge audit is `{audit['audit_status']}`.")
     gate = build_quality_gate_artifact(
         fingerprint=fingerprint,
         metric_results=results,
@@ -308,6 +345,7 @@ def build_workload_eval_evidence(
     integrity = (
         validate_config_fingerprint(fingerprint)
         + validate_quality_gate_artifact(gate)
+        + (validate_judge_audit(evidence["judge_audit"]) if evidence["judge_audit"] else [])
         + (validate_metric_vector(evidence["metric_vector"]) if evidence["metric_vector"] else [])
         + check_evidence_linkage(fingerprint, gate, evidence["metric_vector"])
     )

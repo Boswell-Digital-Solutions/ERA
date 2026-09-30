@@ -22,6 +22,7 @@ from era_core.eval_contracts import (
     validate_quality_efficiency_comparison,
     validate_quality_gate_artifact,
 )
+from era_core.eval_judge import validate_judge_audit
 from era_core.eval_lane import eval_policy, required_dimensions, workload_dirname
 from era_core.eval_review import EVAL_KINDS
 from era_core.hashing import sha256_path
@@ -30,6 +31,7 @@ _VALIDATORS = {
     "fingerprint": validate_config_fingerprint,
     "quality_gate": validate_quality_gate_artifact,
     "metric_vector": validate_metric_vector,
+    "judge_audit": validate_judge_audit,
     "comparison": validate_quality_efficiency_comparison,
 }
 
@@ -111,8 +113,12 @@ def validate_eval_evidence(
             elif chain_entry.get("sha256") != ref["sha256"] or chain_entry.get("path") != ref["path"]:
                 errors.append(f"Evidence hash chain has stale {kind} reference for {workload_id}.")
 
-        errors.extend(_check_completeness(label, entry, loaded))
+        judge_policy = ((eval_policy(v2_workloads.get(workload_id, {})) or {}).get("quality_gate_policy") or {}).get(
+            "judge_policy"
+        )
+        errors.extend(_check_completeness(label, entry, loaded, judge_required=bool(judge_policy)))
         errors.extend(f"{label}: {item}" for item in _check_linkage(loaded))
+        errors.extend(f"{label}: {item}" for item in _check_judge(loaded, judge_policy))
         comparison = loaded.get("comparison")
         if comparison is not None:
             errors.extend(
@@ -132,7 +138,32 @@ def validate_eval_evidence(
     return errors
 
 
-def _check_completeness(label: str, entry: dict[str, Any], loaded: dict[str, dict[str, Any]]) -> list[str]:
+def _check_judge(loaded: dict[str, dict[str, Any]], judge_policy: dict[str, Any] | None) -> list[str]:
+    """A judge metric may sit in the quality gate only after a passed audit."""
+    audit, gate = loaded.get("judge_audit"), loaded.get("quality_gate")
+    if audit is None or gate is None:
+        return []
+    errors: list[str] = []
+    fingerprint = loaded.get("fingerprint")
+    if fingerprint is not None:
+        if audit.get("config_fingerprint_id") != fingerprint.get("fingerprint_id"):
+            errors.append("judge audit references a different config fingerprint id.")
+        if audit.get("config_fingerprint_sha256") != fingerprint.get("sha256"):
+            errors.append("judge audit references a different config fingerprint digest.")
+    if audit.get("audit_status") != "passed":
+        admitted = [m for m in audit.get("judge_metrics", []) if m in (gate.get("metric_results") or {})]
+        if admitted:
+            errors.append(f"judge metrics {admitted} are in the quality gate without a passed audit.")
+        if gate.get("gate_status") == "passed":
+            errors.append("quality gate passed although the judge audit did not pass.")
+    if judge_policy and sorted(audit.get("judge_metrics", [])) != sorted(judge_policy.get("judge_metrics", [])):
+        errors.append("judge audit metrics differ from the manifest judge_policy.")
+    return errors
+
+
+def _check_completeness(
+    label: str, entry: dict[str, Any], loaded: dict[str, dict[str, Any]], judge_required: bool = False
+) -> list[str]:
     errors: list[str] = []
     if "comparison" not in loaded:
         errors.append(f"{label}: comparison artifact is missing.")
@@ -142,6 +173,8 @@ def _check_completeness(label: str, entry: dict[str, Any], loaded: dict[str, dic
         for kind in ("fingerprint", "quality_gate"):
             if kind not in loaded:
                 errors.append(f"{label}: {kind} artifact is missing.")
+    if judge_required and entry.get("quality_status") != "invalid" and "judge_audit" not in loaded:
+        errors.append(f"{label}: judge_audit artifact is missing.")
     if claim in {"permitted", "no_claim_unstable"} and "metric_vector" not in loaded:
         errors.append(f"{label}: metric_vector artifact is missing for claim `{claim}`.")
     if claim not in {"evidence_blocked"} and entry.get("quality_status") == "invalid":

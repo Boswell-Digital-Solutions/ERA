@@ -8,7 +8,7 @@ from typing import Any
 
 from era_core.eval_telemetry import ENERGY_SCOPES
 
-EVAL_KINDS = ("fingerprint", "quality_gate", "metric_vector", "comparison")
+EVAL_KINDS = ("fingerprint", "quality_gate", "metric_vector", "judge_audit", "comparison")
 
 
 def load_eval_artifacts(run_root: Path, refs: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -30,6 +30,27 @@ def load_eval_artifacts(run_root: Path, refs: dict[str, Any]) -> dict[str, dict[
 
 def eval_hash_values(refs: dict[str, Any]) -> list[str]:
     return [entry[kind]["sha256"] for entry in (refs or {}).values() for kind in EVAL_KINDS if entry.get(kind)]
+
+
+def _judge_lines(audit: dict[str, Any]) -> list[str]:
+    judge = audit.get("judge") or {}
+    counts = audit.get("counts") or {}
+    lines = [
+        f"- judge audit: `{audit['audit_status']}` (evidence only, never canonical truth)",
+        f"  - judge family `{_fmt(judge.get('model_family'))}`, subject family `{_fmt(audit.get('subject_family'))}`",
+        f"  - paired items `{counts.get('paired_items', 0)}`, position consistency `{_fmt(audit.get('position_consistency'))}`",
+        f"  - human-labelled items `{counts.get('calibration_items', 0)}`, agreement `{_fmt(audit.get('human_agreement'))}`,"
+        f" kappa `{_fmt(audit.get('cohens_kappa'))}`",
+        f"  - disagreements kept: `{audit.get('disagreement_total', 0)}`"
+        + (" (list truncated)" if audit.get("disagreements_truncated") else ""),
+    ]
+    for reason in audit.get("failure_reasons", []):
+        lines.append(f"  - audit reason: {reason}")
+    for item in (audit.get("disagreements") or [])[:5]:
+        lines.append(f"  - disagreement `{item.get('item_id')}` kind=`{item.get('kind')}`")
+    if audit["audit_status"] != "passed":
+        lines.append(f"  - judge metrics not admitted to the quality gate: `{', '.join(audit.get('judge_metrics', []))}`")
+    return lines
 
 
 def _interval_text(interval: dict[str, Any] | None) -> str:
@@ -64,6 +85,9 @@ def render_eval_section(refs: dict[str, Any], artifacts: dict[str, dict[str, Any
         lines.append(f"- quality gate status: `{_fmt((gate or {}).get('gate_status') or entry.get('quality_status'))}`")
         for reason in (gate or {}).get("failure_reasons", []) or []:
             lines.append(f"  - quality reason: {reason}")
+        audit = found.get("judge_audit")
+        if audit is not None:
+            lines.extend(_judge_lines(audit))
         lines.append(f"- candidate fingerprint: `{_fmt((fingerprint or {}).get('fingerprint_id'))}`")
         lines.append(f"- candidate config digest: `{_fmt((fingerprint or {}).get('config_digest'))}`")
         if comparison is not None:

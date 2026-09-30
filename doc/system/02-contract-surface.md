@@ -146,3 +146,11 @@ A run with an opted-in workload writes `evaluation_export.json` (`ERAEvaluationE
 `era_core/eval_export.py` rebuilds the export from the run folder during validation. Any difference fails the run. A run without an opted-in workload has no export.
 
 The contract is local to ERA. `consumer_contract_status` says `local_to_era`. DataForge Local persistence, a Forge_Command review surface, and promotion to `forge_contract_core` need separate decisions. See `docs/eval/BDS-ERA-EVAL-v0.1_WP12_INTERFACE.md`.
+
+## Baseline Snapshot (operator decision 4)
+
+When a comparison names a baseline run, the newer run stores `baseline_snapshot.json` (`BaselineSnapshot.v1`). It copies the baseline's fingerprint, quality gate, and metric vector, and records their hashes. The snapshot is in the hash chain and in the evaluation export as `baseline`.
+
+Validation proves the baseline from the snapshot: its evidence validates, its quality gate passed, its fingerprint is comparable under the manifest dimensions, and the comparison's baseline value matches. The baseline run folder is not needed. If it still exists, it must match the snapshot, so an edited folder cannot pass beside a good snapshot. `reconstruct_claim(..., from_snapshot=True)` rebuilds the claim without any sibling run folder.
+
+A run made before this change has no snapshot and still needs its baseline folder.

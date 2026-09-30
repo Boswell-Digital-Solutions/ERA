@@ -32,11 +32,16 @@ def _load(path: Path) -> dict[str, Any] | None:
         return None
 
 
-def reconstruct_claim(run_dir: Path, workload_id: str) -> dict[str, Any]:
+def reconstruct_claim(run_dir: Path, workload_id: str, from_snapshot: bool = False) -> dict[str, Any]:
     """Recompute the decision for one workload from the run directory alone.
 
     Prior runs count only when they were created before the candidate. A later
     run cannot change an earlier claim.
+
+    With ``from_snapshot`` the baseline is the run's own baseline snapshot and no
+    sibling run folder is read. That works after old runs are archived. It cannot
+    re-check which other priors were rejected, so it proves the claim given the
+    recorded baseline, not the choice of baseline.
     """
     directory = run_dir / "evidence" / "efficiency" / "eval" / workload_dirname(workload_id)
     candidate = {
@@ -59,7 +64,18 @@ def reconstruct_claim(run_dir: Path, workload_id: str) -> dict[str, Any]:
     )
     policy = eval_policy(workload) or {}
     selection: dict[str, Any] = {"baseline": None, "comparison": None, "rejected": [], "considered": 0}
-    if candidate["fingerprint"] is not None:
+    snapshot = _load(directory / "baseline_snapshot.json") if from_snapshot else None
+    if from_snapshot and snapshot is not None and candidate["fingerprint"] is not None:
+        prior = {
+            "run_id": snapshot["baseline_run_id"],
+            "fingerprint": snapshot["fingerprint"],
+            "quality_gate": snapshot["quality_gate"],
+            "metric_vector": snapshot["metric_vector"],
+        }
+        selection = select_eligible_baseline(
+            candidate["fingerprint"], [prior], required_dimensions(policy), tuple(policy.get("non_binding_dimensions") or ())
+        )
+    elif candidate["fingerprint"] is not None:
         cutoff = candidate["fingerprint"]["created_at"]
         priors = [
             prior
@@ -85,10 +101,10 @@ def reconstruct_claim(run_dir: Path, workload_id: str) -> dict[str, Any]:
          "baseline_fingerprint_id": ((selection["baseline"] or {}).get("fingerprint") or {}).get("fingerprint_id")}
 
 
-def compare_to_stored(run_dir: Path, workload_id: str) -> dict[str, Any]:
+def compare_to_stored(run_dir: Path, workload_id: str, from_snapshot: bool = False) -> dict[str, Any]:
     """Return ``{"match": bool, "differences": [...], "reconstructed": {...}}``."""
     stored = _load(run_dir / "evidence" / "efficiency" / "eval" / workload_dirname(workload_id) / "comparison.json")
-    rebuilt = reconstruct_claim(run_dir, workload_id)
+    rebuilt = reconstruct_claim(run_dir, workload_id, from_snapshot=from_snapshot)
     if stored is None:
         return {"match": False, "differences": ["Stored comparison is missing."], "reconstructed": rebuilt}
     differences = [

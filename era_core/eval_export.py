@@ -36,6 +36,26 @@ def _load(path: Path) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def _baseline_block(snapshot: dict[str, Any] | None, ref: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The baseline evidence, so a consumer keeps the chain when the baseline run folder is archived."""
+    if snapshot is None:
+        return None
+    vector = snapshot.get("metric_vector") or {}
+    return {
+        "run_id": snapshot["baseline_run_id"],
+        "fingerprint_id": snapshot["baseline_fingerprint_id"],
+        "config_digest": snapshot["baseline_config_digest"],
+        "quality_status": snapshot["baseline_quality_status"],
+        "metrics": {
+            name: {key: metric[key] for key in ("value", "unit", "direction", "aggregation", "scope") if key in metric}
+            for name, metric in sorted((vector.get("metrics") or {}).items())
+        },
+        "part_hashes": snapshot["part_hashes"],
+        "snapshot_digest": snapshot["sha256"],
+        "snapshot_path": (ref or {}).get("path"),
+    }
+
+
 def build_evaluation_export(run_dir: Path) -> dict[str, Any] | None:
     """Build the export from the run folder. Return None when no workload opted in."""
     run = _load(run_dir / "run.json")
@@ -57,6 +77,7 @@ def build_evaluation_export(run_dir: Path) -> dict[str, Any] | None:
         fingerprint = loaded.get("fingerprint") or {}
         vector = loaded.get("metric_vector") or {}
         audit = loaded.get("judge_audit")
+        snapshot = loaded.get("baseline_snapshot")
         workloads.append(
             {
                 "workload_id": workload_id,
@@ -73,6 +94,7 @@ def build_evaluation_export(run_dir: Path) -> dict[str, Any] | None:
                 "baseline_run_id": comparison.get("baseline_run_id"),
                 "baseline_fingerprint_id": comparison.get("baseline_fingerprint_id"),
                 "blocked_reasons": comparison.get("blocked_reasons", []),
+                "baseline": _baseline_block(snapshot, entry.get("baseline_snapshot")),
                 "baseline_rejection_reasons": sorted(
                     {item.get("reason") for item in comparison.get("baseline_rejections", []) if item.get("reason")}
                 ),

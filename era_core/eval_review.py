@@ -8,7 +8,7 @@ from typing import Any
 
 from era_core.eval_telemetry import ENERGY_SCOPES
 
-EVAL_KINDS = ("fingerprint", "quality_gate", "metric_vector", "judge_audit", "isolation_receipt", "comparison")
+EVAL_KINDS = ("fingerprint", "quality_gate", "metric_vector", "judge_audit", "isolation_receipt", "baseline_snapshot", "comparison")
 
 
 def load_eval_artifacts(run_root: Path, refs: dict[str, Any]) -> dict[str, dict[str, Any]]:

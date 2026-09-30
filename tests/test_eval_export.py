@@ -45,8 +45,15 @@ class ExportContentTests(ValidationBase):
         self.assertEqual(workload["isolation_status"], "not_required")
         self.assertIn("median_ms", workload["metrics"])
         self.assertEqual(
-            set(workload["artifacts"]), {"fingerprint", "quality_gate", "metric_vector", "isolation_receipt", "comparison"}
+            set(workload["artifacts"]),
+            {"fingerprint", "quality_gate", "metric_vector", "isolation_receipt", "baseline_snapshot", "comparison"},
         )
+        baseline = workload["baseline"]
+        self.assertEqual(baseline["run_id"], first.name)
+        self.assertEqual(baseline["quality_status"], "passed")
+        self.assertIn("median_ms", baseline["metrics"])
+        self.assertEqual(baseline["snapshot_digest"], workload["artifacts"]["baseline_snapshot"]["sha256"])
+        self.assertEqual(set(baseline["part_hashes"]), {"fingerprint", "quality_gate", "metric_vector"})
         for kind, ref in workload["artifacts"].items():
             self.assertEqual(json.loads((second / ref["path"]).read_text(encoding="utf-8"))["sha256"], ref["sha256"], kind)
 

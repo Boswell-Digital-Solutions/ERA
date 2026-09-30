@@ -18,13 +18,13 @@ Findings for this repo. Each entry has a date, the problem, the root cause, the 
 
 ## 2026-09-30 — Deleting an old run invalidates newer runs that used it as a baseline
 
-**Status: OPEN, by design.**
+**Status: CLOSED 2026-09-30** (operator decision 4: persistence keeps the baseline chain).
 
-**Problem.** `validate_run_dir` checks that the recorded baseline run still exists and still validates (BDS-ERA-EVAL-v0.1 WP05). A newer run fails validation if its baseline run folder is deleted.
+**Problem.** `validate_run_dir` needed the baseline run folder (BDS-ERA-EVAL-v0.1 WP05). A newer run failed validation if that folder was deleted.
 
-**Root cause.** The check makes a stale baseline reference fail closed.
+**Fix.** Each comparison that names a baseline now stores a sealed `BaselineSnapshot.v1` in the newer run. It copies the baseline's fingerprint, quality gate, and metric vector. Validation checks the claim against the snapshot. If the baseline folder still exists, it must match the snapshot. A run can be archived without breaking newer runs. The evaluation export carries a `baseline` block from the snapshot.
 
-**Scope.** Only runs whose workload has an `evaluation` block. Archive old run folders together with the runs that depend on them. A future work package can add a baseline snapshot inside the newer run, so the newer run does not depend on the older folder.
+**Limit.** Reconstruction from the snapshot proves the claim given the recorded baseline. It cannot re-check which other prior runs were rejected. Runs made before this change have no snapshot and still need the baseline folder.
 
 ## 2026-09-30 — No downstream consumer for evaluation evidence
 

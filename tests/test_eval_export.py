@@ -6,74 +6,101 @@ import unittest
 from pathlib import Path
 
 from era_cli.commands.run import execute_run
+from era_core.eval_contract_export import AUTHORITY, payload_digest
 from era_core.eval_export import (
-    AUTHORITY_STATEMENT,
     EXPORT_FILENAME,
     EXPORT_SCHEMA,
     build_evaluation_export,
+    export_reference,
     validate_evaluation_export,
 )
-from era_core.hashing import sha256_json, sha256_path, write_json
+from era_core.hashing import write_json
 from era_core.validation import validate_run_dir
 from tests.test_artifact_generation import init_git_repo
-from tests.test_eval_validation import EVAL, FAST, SLOW, ValidationBase, refresh_entries
 from tests.test_efficiency import write_efficiency_manifest
+from tests.test_eval_validation import EVAL, FAST, SLOW, ValidationBase, refresh_entries
 
 
-def reseal(payload: dict) -> dict:
-    payload["sha256"] = sha256_json({k: v for k, v in payload.items() if k != "sha256"})
-    return payload
+def reseal(artifact: dict) -> dict:
+    """Recompute the payload digest and the envelope references, as a forger who edits the payload would."""
+    artifact["payload"]["payload_digest"] = payload_digest(artifact["payload"])
+    artifact["signature"] = "unsigned:" + artifact["payload"]["payload_digest"]
+    return artifact
 
 
 class ExportContentTests(ValidationBase):
     def export(self, run_dir: Path) -> dict:
         return json.loads((run_dir / EXPORT_FILENAME).read_text(encoding="utf-8"))
 
-    def test_export_summarizes_the_run_and_states_its_authority(self) -> None:
+    def test_export_is_the_admitted_artifact_and_states_its_authority(self) -> None:
         first, second = self.make_runs()
-        data = self.export(second)
+        artifact = self.export(second)
+        payload = artifact["payload"]
         comparison = self.read(second, "comparison.json")
-        self.assertEqual(data["schema_version"], EXPORT_SCHEMA)
-        self.assertEqual(data["run_id"], second.name)
-        self.assertEqual(data["authority"], AUTHORITY_STATEMENT)
-        self.assertEqual(data["consumer_contract_status"], "local_to_era")
-        self.assertEqual(data["execution_posture"]["sandbox"], "none")
-        (workload,) = data["workloads"]
-        self.assertEqual(workload["workload_id"], "eval_probe")
+        self.assertEqual(artifact["artifact_family"], "era_evaluation_export")
+        self.assertEqual((artifact["produced_by_system"], artifact["promotion_class"]), ("ERA", "local_only"))
+        self.assertEqual((artifact["sensitivity_class"], artifact["visibility_class"]), ("internal", "operator"))
+        self.assertTrue(artifact["signature"].startswith("unsigned:sha256:"))
+        self.assertEqual(payload["schema_version"], EXPORT_SCHEMA)
+        self.assertEqual(payload["run_id"], second.name)
+        self.assertEqual(payload["authority"], AUTHORITY)
+        self.assertEqual(
+            set(payload["execution_posture"]), {"sandbox", "sandbox_backend", "network", "target_filesystem", "target_trust"}
+        )
+        (workload,) = payload["workloads"]
         self.assertEqual(workload["claim_status"], comparison["claim_status"])
         self.assertEqual(workload["baseline_run_id"], first.name)
         self.assertEqual(workload["isolation_status"], "not_required")
-        self.assertIn("median_ms", workload["metrics"])
+        self.assertRegex(workload["metrics"]["median_ms"]["value"], r"^(0|[1-9][0-9]*(\.[0-9]*[1-9])?)$")
+        self.assertEqual(workload["metrics"]["median_ms"]["aggregation"], "median")
         self.assertEqual(
             set(workload["artifacts"]),
             {"fingerprint", "quality_gate", "metric_vector", "isolation_receipt", "baseline_snapshot", "comparison"},
         )
         baseline = workload["baseline"]
-        self.assertEqual(baseline["run_id"], first.name)
-        self.assertEqual(baseline["quality_status"], "passed")
-        self.assertIn("median_ms", baseline["metrics"])
+        self.assertEqual((baseline["run_id"], baseline["quality_status"]), (first.name, "passed"))
         self.assertEqual(baseline["snapshot_digest"], workload["artifacts"]["baseline_snapshot"]["sha256"])
-        self.assertEqual(set(baseline["part_hashes"]), {"fingerprint", "quality_gate", "metric_vector"})
         for kind, ref in workload["artifacts"].items():
             self.assertEqual(json.loads((second / ref["path"]).read_text(encoding="utf-8"))["sha256"], ref["sha256"], kind)
+
+    def test_no_run_time_identity_or_local_path_leaves_the_run(self) -> None:
+        _, second = self.make_runs()
+        text = (second / EXPORT_FILENAME).read_text(encoding="utf-8")
+        for needle in ("attested_by", "executes_target_code", "snapshot_path", "/tmp/", "/home/", "consumer_contract_status"):
+            self.assertNotIn(needle, text)
 
     def test_export_is_deterministic_and_hash_chained(self) -> None:
         _, second = self.make_runs()
         self.assertEqual(build_evaluation_export(second), self.export(second))
-        chain = json.loads((second / "hashes.json").read_text(encoding="utf-8"))["evidence_hash_chain"]
-        self.assertEqual(chain["evaluation_export"]["sha256"], self.export(second)["sha256"])
-        self.assertTrue(any(e["path"] == EXPORT_FILENAME for e in json.loads((second / "hashes.json").read_text())["entries"]))
+        hashes = json.loads((second / "hashes.json").read_text(encoding="utf-8"))
+        self.assertEqual(hashes["evidence_hash_chain"]["evaluation_export"]["sha256"], export_reference(self.export(second)))
+        self.assertTrue(any(e["path"] == EXPORT_FILENAME for e in hashes["entries"]))
+
+    def test_no_float_appears_anywhere_in_the_payload(self) -> None:
+        _, second = self.make_runs()
+
+        def walk(value):
+            if isinstance(value, float):
+                self.fail(f"float in export: {value}")
+            elif isinstance(value, dict):
+                for item in value.values():
+                    walk(item)
+            elif isinstance(value, list):
+                for item in value:
+                    walk(item)
+
+        walk(self.export(second))
 
     def test_blocked_runs_export_their_reasons(self) -> None:
         _, second = self.make_runs(first=(0.95, SLOW), second=(0.2, FAST))
-        (workload,) = self.export(second)["workloads"]
+        (workload,) = self.export(second)["payload"]["workloads"]
         self.assertEqual((workload["claim_status"], workload["quality_status"]), ("quality_blocked", "failed"))
         self.assertTrue(workload["blocked_reasons"])
         self.assertEqual(workload["efficiency_status"], "not_evaluated")
 
     def test_rejected_baselines_export_only_their_reasons(self) -> None:
         _, second = self.make_runs(first=(0.1, SLOW), second=(0.95, FAST))
-        (workload,) = self.export(second)["workloads"]
+        (workload,) = self.export(second)["payload"]["workloads"]
         self.assertEqual(workload["claim_status"], "no_baseline")
         self.assertEqual(workload["baseline_rejection_reasons"], ["quality_failed"])
 
@@ -107,8 +134,8 @@ class ExportValidationTests(ValidationBase):
     def test_a_resealed_claim_edit_is_caught_by_the_rebuild(self) -> None:
         _, second = self.make_runs(second=(0.2, FAST))
         forged = self.load(second)
-        forged["workloads"][0]["claim_status"] = "permitted"
-        forged["workloads"][0]["efficiency_status"] = "improvement"
+        forged["payload"]["workloads"][0]["claim_status"] = "permitted"
+        forged["payload"]["workloads"][0]["efficiency_status"] = "improvement"
         write_json(self.path(second), reseal(forged))
         refresh_entries(second)
         self.assertBlocked(second, "differs from the run evidence")
@@ -116,7 +143,7 @@ class ExportValidationTests(ValidationBase):
     def test_a_changed_authority_statement_is_caught(self) -> None:
         _, second = self.make_runs()
         forged = self.load(second)
-        forged["authority"] = "Canonical truth."
+        forged["payload"]["authority"] = "Canonical truth."
         write_json(self.path(second), reseal(forged))
         refresh_entries(second)
         self.assertBlocked(second, "authority statement was changed")
@@ -143,10 +170,10 @@ class ExportValidationTests(ValidationBase):
         _, second = self.make_runs()
         comparison = self.read(second, "comparison.json")
         comparison["blocked_reasons"] = ["edited"]
-        write_json(second / EVAL / "comparison.json", reseal(comparison))
+        comparison["sha256"] = "0" * 64
+        write_json(second / EVAL / "comparison.json", comparison)
         refresh_entries(second)
-        result = validate_run_dir(second)
-        self.assertFalse(result["ok"])
+        self.assertFalse(validate_run_dir(second)["ok"])
 
     def test_an_export_without_workloads_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

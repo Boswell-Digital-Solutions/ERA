@@ -1,0 +1,212 @@
+{
+  "vector_id": "forge-era-evaluation-export-decimal-v1-2026-09-30",
+  "description": "Canonical decimal vector for RFC-ERA-EVAL-01. `input` is decimal literal text. `expected` is the one canonical form, or null when the input has no canonical form. Python, Node, and Rust must agree on every case.",
+  "canonical_pattern": "^(0|-?(0\\.[0-9]*[1-9]|[1-9][0-9]*(\\.[0-9]*[1-9])?))$",
+  "max_exponent_magnitude": 1000,
+  "cases": [
+    {
+      "input": "0",
+      "expected": "0"
+    },
+    {
+      "input": "0.0",
+      "expected": "0"
+    },
+    {
+      "input": "-0",
+      "expected": "0"
+    },
+    {
+      "input": "-0.0",
+      "expected": "0"
+    },
+    {
+      "input": "+0",
+      "expected": "0"
+    },
+    {
+      "input": "00",
+      "expected": "0"
+    },
+    {
+      "input": "0e5",
+      "expected": "0"
+    },
+    {
+      "input": "16",
+      "expected": "16"
+    },
+    {
+      "input": "016",
+      "expected": "16"
+    },
+    {
+      "input": "+16",
+      "expected": "16"
+    },
+    {
+      "input": "16.0",
+      "expected": "16"
+    },
+    {
+      "input": "16.50",
+      "expected": "16.5"
+    },
+    {
+      "input": "0.50",
+      "expected": "0.5"
+    },
+    {
+      "input": ".5",
+      "expected": "0.5"
+    },
+    {
+      "input": "5.",
+      "expected": "5"
+    },
+    {
+      "input": "-.5",
+      "expected": "-0.5"
+    },
+    {
+      "input": "-0.500",
+      "expected": "-0.5"
+    },
+    {
+      "input": "100",
+      "expected": "100"
+    },
+    {
+      "input": "1e2",
+      "expected": "100"
+    },
+    {
+      "input": "1E2",
+      "expected": "100"
+    },
+    {
+      "input": "1e-5",
+      "expected": "0.00001"
+    },
+    {
+      "input": "1.5e-3",
+      "expected": "0.0015"
+    },
+    {
+      "input": "12345e-2",
+      "expected": "123.45"
+    },
+    {
+      "input": "1.2345e+3",
+      "expected": "1234.5"
+    },
+    {
+      "input": "0.30000000000000004",
+      "expected": "0.30000000000000004"
+    },
+    {
+      "input": "150000000000000000000",
+      "expected": "150000000000000000000"
+    },
+    {
+      "input": "1.5e20",
+      "expected": "150000000000000000000"
+    },
+    {
+      "input": "-12.34e1",
+      "expected": "-123.4"
+    },
+    {
+      "input": "0.000e10",
+      "expected": "0"
+    },
+    {
+      "input": "9007199254740993",
+      "expected": "9007199254740993"
+    },
+    {
+      "input": "",
+      "expected": null
+    },
+    {
+      "input": ".",
+      "expected": null
+    },
+    {
+      "input": "-",
+      "expected": null
+    },
+    {
+      "input": "+",
+      "expected": null
+    },
+    {
+      "input": "e5",
+      "expected": null
+    },
+    {
+      "input": "1e",
+      "expected": null
+    },
+    {
+      "input": "1e+",
+      "expected": null
+    },
+    {
+      "input": "NaN",
+      "expected": null
+    },
+    {
+      "input": "nan",
+      "expected": null
+    },
+    {
+      "input": "Infinity",
+      "expected": null
+    },
+    {
+      "input": "-Infinity",
+      "expected": null
+    },
+    {
+      "input": "inf",
+      "expected": null
+    },
+    {
+      "input": "0x10",
+      "expected": null
+    },
+    {
+      "input": "1,5",
+      "expected": null
+    },
+    {
+      "input": " 1",
+      "expected": null
+    },
+    {
+      "input": "1 ",
+      "expected": null
+    },
+    {
+      "input": "1e5000",
+      "expected": null
+    },
+    {
+      "input": "1e-5000",
+      "expected": null
+    },
+    {
+      "input": "--1",
+      "expected": null
+    },
+    {
+      "input": "1.2.3",
+      "expected": null
+    },
+    {
+      "input": "١٢",
+      "expected": null
+    }
+  ]
+}

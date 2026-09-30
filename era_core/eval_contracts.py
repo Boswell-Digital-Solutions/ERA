@@ -397,7 +397,7 @@ def validate_metric_vector(payload: dict[str, Any]) -> list[str]:
                 errors.append(f"{label} metric `{name}` needs a numeric value.")
             if entry.get("direction") not in METRIC_DIRECTIONS:
                 errors.append(f"{label} metric `{name}` needs a declared direction.")
-            if base_metric_name(name) in ENERGY_METRICS:
+            if base_metric_name(name) in ENERGY_METRICS | {"joules_per_successful_task"}:
                 if entry.get("scope") not in ENERGY_SCOPES:
                     errors.append(f"{label} energy metric `{name}` needs a declared measurement scope.")
     elif metrics is not None:

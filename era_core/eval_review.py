@@ -140,6 +140,8 @@ def render_eval_section(refs: dict[str, Any], artifacts: dict[str, dict[str, Any
             lines.append(f"- warmup iterations discarded: `{warmup}`")
         for problem in entry.get("telemetry_problems", []):
             lines.append(f"- telemetry problem: {problem}")
+        for problem in entry.get("agent_problems", []):
+            lines.append(f"- agent evidence problem: {problem}")
         for note in entry.get("telemetry_notes", []):
             lines.append(f"- telemetry note: {note}")
         if comparison is not None and comparison["claim_status"] == "permitted":

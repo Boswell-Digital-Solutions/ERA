@@ -43,3 +43,30 @@ def make_fingerprint(**overrides: Any) -> dict[str, Any]:
         else:
             kwargs[key] = value
     return build_config_fingerprint(**kwargs)
+
+
+class FakeContainedSandbox:
+    """Test double for a contained backend. It reports the contained posture and runs commands as they are.
+
+    It proves how ERA reads and records the posture. Real namespace behavior is
+    covered by tests/test_sandbox.py.
+    """
+
+    level = "contained"
+    backend = "unshare"
+    network = "isolated"
+    target_filesystem = "overlay_protected"
+
+    def posture(self) -> dict[str, object]:
+        return {
+            "sandbox": self.level,
+            "sandbox_backend": self.backend,
+            "network": self.network,
+            "target_filesystem": self.target_filesystem,
+        }
+
+    def wrap(self, command: list[str], cwd: str) -> list[str]:
+        return command
+
+    def cleanup(self) -> None:
+        return None

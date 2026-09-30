@@ -263,7 +263,7 @@ def _write_eval_evidence(
             "agent_problems": evidence.get("agent_problems", []),
         }
         artifacts = {**evidence, "comparison": eval_comparisons.get(workload_id)}
-        for key in ("fingerprint", "quality_gate", "metric_vector", "judge_audit", "comparison"):
+        for key in ("fingerprint", "quality_gate", "metric_vector", "judge_audit", "isolation_receipt", "comparison"):
             if artifacts[key] is not None:
                 path = directory / f"{key}.json"
                 write_json(path, artifacts[key])
@@ -521,6 +521,8 @@ def execute_run(
             execution_posture={
                 "executes_target_code": True,
                 **(sandbox.posture() if sandbox is not None else none_posture()),
+                "target_trust": target_trust,
+                "read_only_invariant_scope": "enforced_by_overlay" if contained else "target_git_tree_only",
             },
         )
         eval_comparisons = resolve_comparisons(

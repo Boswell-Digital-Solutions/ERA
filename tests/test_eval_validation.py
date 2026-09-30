@@ -78,7 +78,9 @@ class IntactEvidenceTests(ValidationBase):
         first, second = self.make_runs()
         chain = json.loads((second / "hashes.json").read_text(encoding="utf-8"))["evidence_hash_chain"]
         kinds = {(item["workload_id"], item["kind"]) for item in chain["evaluation_artifacts"]}
-        self.assertEqual(kinds, {("eval_probe", k) for k in ("fingerprint", "quality_gate", "metric_vector", "comparison")})
+        self.assertEqual(
+            kinds, {("eval_probe", k) for k in ("fingerprint", "quality_gate", "metric_vector", "isolation_receipt", "comparison")}
+        )
 
 
 class TamperTests(ValidationBase):

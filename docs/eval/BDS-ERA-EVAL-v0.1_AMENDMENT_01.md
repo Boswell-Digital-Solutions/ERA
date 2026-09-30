@@ -61,3 +61,9 @@ ERA reads quality results from a file that already exists in the target tree. A 
 ## A7. Open item outside this plan
 
 The legacy v1 baseline selection in `era_core/efficiency.py` orders prior runs by `completed_at` at one-second resolution and has the same tie risk that WP06 fixed for fingerprints. No plan covers it.
+
+## A8. Isolation gating (WP11, decision D5)
+
+A workload requires isolation when its `subject_kind` is `agent` or it declares an agentic, MCP-tool, generated-code, external-repo, or untrusted trait. An unsatisfied `IsolationReceipt.v1` maps to `evidence_blocked`, with the reason in `blocked_reasons`. No claim status was added for it. The operator can rule to add a dedicated `isolation_required` claim status later.
+
+Ruling 3 (sandbox posture in the execution identity) was recorded in the fingerprint, but comparison did not require it. WP11 makes `execution.sandbox`, `execution.network`, and `execution.target_filesystem` required comparison dimensions for every opted-in workload.

@@ -65,6 +65,12 @@ from era_core.eval_agent import (
     validate_agent_policy,
     validate_agent_subject,
 )
+from era_core.eval_isolation import (
+    build_isolation_receipt,
+    isolation_requirement,
+    validate_isolation_receipt,
+    validate_workload_traits,
+)
 from era_core.eval_judge import (
     build_judge_audit,
     read_judge_evidence,
@@ -125,6 +131,7 @@ def validate_eval_policy(policy: dict[str, Any]) -> list[str]:
             errors.append(f"evaluation.primary_metric `{primary}` is not a declared metric.")
         elif metrics[primary] not in {"lower_is_better", "higher_is_better"}:
             errors.append("evaluation.primary_metric needs lower_is_better or higher_is_better.")
+    errors.extend(validate_workload_traits(policy))
     if policy.get("subject_kind") == "agent":
         errors.extend(validate_agent_subject(policy.get("subject_identity")))
     if "agent_policy" in policy:
@@ -140,6 +147,8 @@ def validate_eval_policy(policy: dict[str, Any]) -> list[str]:
     return errors
 
 
+# A contained run and an uncontained run never compare as equal (operator ruling 3).
+ISOLATION_DIMENSIONS = ("execution.sandbox", "execution.network", "execution.target_filesystem")
 TELEMETRY_SENSITIVE_DIMENSIONS = (
     "execution.hardware_fingerprint",
     "execution.concurrency",
@@ -179,7 +188,7 @@ def required_dimensions(policy: dict[str, Any]) -> tuple[str, ...]:
         if policy.get("subject_kind") == "agent"
         else ()
     )
-    return tuple(dict.fromkeys(DEFAULT_REQUIRED_DIMENSIONS + telemetry + agent + energy + declared))
+    return tuple(dict.fromkeys(DEFAULT_REQUIRED_DIMENSIONS + ISOLATION_DIMENSIONS + telemetry + agent + energy + declared))
 
 
 def sample_policy(policy: dict[str, Any]) -> dict[str, Any]:
@@ -238,6 +247,7 @@ def build_workload_eval_evidence(
         "metric_vector": None,
         "quality_status": "invalid",
         "judge_audit": None,
+        "isolation_receipt": None,
         "problems": problems,
         "telemetry_problems": [],
         "telemetry_notes": [],
@@ -272,6 +282,15 @@ def build_workload_eval_evidence(
         execution_identity=execution_identity,
     )
     evidence["fingerprint"] = fingerprint
+    required, required_reasons = isolation_requirement(policy)
+    evidence["isolation_receipt"] = build_isolation_receipt(
+        fingerprint=fingerprint,
+        posture=execution_posture,
+        target_trust=str(execution_posture.get("target_trust", "unknown")),
+        read_only_invariant_scope=str(execution_posture.get("read_only_invariant_scope", "unknown")),
+        required=required,
+        required_reasons=required_reasons,
+    )
 
     gate_policy = policy["quality_gate_policy"]
     results, count, refs, _, read_problems = _read_quality_results(
@@ -393,6 +412,7 @@ def build_workload_eval_evidence(
     integrity = (
         validate_config_fingerprint(fingerprint)
         + validate_quality_gate_artifact(gate)
+        + validate_isolation_receipt(evidence["isolation_receipt"])
         + (validate_judge_audit(evidence["judge_audit"]) if evidence["judge_audit"] else [])
         + (validate_metric_vector(evidence["metric_vector"]) if evidence["metric_vector"] else [])
         + check_evidence_linkage(fingerprint, gate, evidence["metric_vector"])
@@ -474,6 +494,7 @@ def resolve_comparisons(
             primary_metric=primary_metric(policy),
             min_samples=int(sample_policy(policy).get("min_samples", 0)),
             require_ci_separation=bool(sample_policy(policy).get("require_ci_separation", False)),
+            isolation_status=(candidate.get("isolation_receipt") or {}).get("status", "not_required"),
         )
         comparisons[workload_id] = build_comparison_artifact(
             run_id=run_id,
@@ -509,6 +530,7 @@ def apply_quality_gate(
         if artifact is not None:
             claim = artifact["claim_status"]
             comparison["claim_status"] = claim
+            comparison["isolation_status"] = artifact.get("isolation_status", "not_required")
             comparison["comparability_status"] = artifact["comparability_status"]
             comparison["baseline_run_id"] = artifact["baseline_run_id"]
             comparison["blocked_reasons"] = artifact["blocked_reasons"]

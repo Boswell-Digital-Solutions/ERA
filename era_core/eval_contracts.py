@@ -426,6 +426,7 @@ def build_quality_efficiency_comparison(
     blocked_reasons: list[str],
     baseline_rejections: list[dict[str, Any]] | None = None,
     primary_metric: str = "median_ms",
+    isolation_status: str = "not_required",
     created_at: str | None = None,
 ) -> dict[str, Any]:
     return _seal(
@@ -445,6 +446,7 @@ def build_quality_efficiency_comparison(
             "blocked_reasons": blocked_reasons,
             "baseline_rejections": baseline_rejections or [],
             "primary_metric": primary_metric,
+            "isolation_status": isolation_status,
             "baseline_run_id": baseline_run_id,
             "candidate_run_id": candidate_run_id,
             "created_at": created_at or utc_now_text(),
@@ -511,6 +513,12 @@ def _check_claim_consistency(payload: dict[str, Any], label: str) -> list[str]:
         errors.append(f"{label} names unstable but claim_status is not no_claim_unstable.")
     if claims_direction and payload["claim_status"] != "permitted":
         errors.append(f"{label} names `{payload['efficiency_status']}` while claim_status is not permitted.")
+    if payload.get("isolation_status") == "unsatisfied" and payload["claim_status"] not in {
+        "quality_blocked",
+        "quality_unproven",
+        "evidence_blocked",
+    }:
+        errors.append(f"{label} makes a claim although required isolation is unsatisfied.")
     if payload["claim_status"] == "quality_blocked" and payload["quality_status"] != "failed":
         errors.append(f"{label} is quality_blocked but quality_status is not failed.")
     if payload["claim_status"] == "quality_unproven" and payload["quality_status"] != "unproven":

@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from unittest import mock
+
 from era_cli.commands.run import execute_run
 from era_core.eval_agent import (
     AGENT_SUBJECT_FIELDS,
@@ -17,6 +19,7 @@ from era_core.eval_agent import (
 from era_core.eval_lane import required_dimensions, validate_eval_policy
 from era_core.eval_stats import bootstrap_ratio_ci, wilson_interval
 from era_core.validation import validate_run_dir
+from tests.fixtures.eval.factories import FakeContainedSandbox
 from tests.test_artifact_generation import init_git_repo
 from tests.test_eval_lane import EVALUATION, write_v2_manifest
 
@@ -222,7 +225,16 @@ class EndToEndAgentTests(unittest.TestCase):
             if subject:
                 policy["subject_identity"].update(subject)
             write_v2_manifest(era_root, repo.name, policy, threshold_pct=20.0)
-            runs.append(execute_run(repo_path=repo, lanes=["efficiency"], mode="full", artifacts_root=era_root / "artifacts" / "era-runs"))
+            with mock.patch("era_cli.commands.run.resolve_sandbox", return_value=FakeContainedSandbox()):
+                runs.append(
+                    execute_run(
+                        repo_path=repo,
+                        lanes=["efficiency"],
+                        mode="full",
+                        artifacts_root=era_root / "artifacts" / "era-runs",
+                        target_trust="untrusted",
+                    )
+                )
         load = lambda name: json.loads((runs[1] / "evidence/efficiency/eval" / "eval_probe" / name).read_text(encoding="utf-8"))  # noqa: E731
         return runs, load
 

@@ -98,7 +98,7 @@ def build_evidence_hash_chain(
         for workload_id, entry in sorted(
             ((evidence_bundles.get("efficiency") or {}).get("evaluation_evidence_refs") or {}).items()
         )
-        for kind in ("fingerprint", "quality_gate", "metric_vector", "judge_audit", "comparison")
+        for kind in ("fingerprint", "quality_gate", "metric_vector", "judge_audit", "isolation_receipt", "comparison")
         if entry.get(kind)
     ]
     chain = {

@@ -103,7 +103,7 @@ PR #5 (Slice 03, contained execution sandbox) merged after the first lock. GATE-
 |---|---|
 | New head (`origin/master`) | `7eac6716058d327055774cd65e2d8530d0b4883c` |
 | Files changed since `13180a8` | `README.md`, `era_cli/commands/run.py`, `era_core/command_runner.py`, new `era_core/sandbox.py`, new `tests/test_sandbox.py` |
-| Test baseline | 47 tests on master (87 with WP01 and WP02) |
+| Test baseline | 43 tests on master (87 with WP01 and WP02) |
 | Doc parity | `BUILD.sh` leaves the tree clean |
 
 New blobs: `README.md` `b69b7db0f32555abd74a0ca594e10299a5152021`, `era_cli/commands/run.py` `d16f63fc6b09cc192ca40cc0db188b99e55d5702`, `era_core/command_runner.py` `dc34a51c3834a36afb796202934085a30691f179`.

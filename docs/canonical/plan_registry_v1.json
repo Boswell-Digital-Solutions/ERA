@@ -1,0 +1,66 @@
+{
+  "$schema": "https://github.com/Boswell-Digital-Solutions/forge/blob/main/docs/canonical/plan_registry_v1.schema.json",
+  "schema_version": "bds.plan-registry.v1",
+  "as_of": "2026-10-16",
+  "authority": {
+    "organization": "Boswell-Digital-Solutions",
+    "registry_repository": "Boswell-Digital-Solutions/forge",
+    "decision_owner": "Charlie Boswell",
+    "protocol_path": "docs/canonical/plan_registry_protocol_v1.md"
+  },
+  "repositories": [
+    {
+      "repository": "Boswell-Digital-Solutions/ERA",
+      "repository_state": "active",
+      "inventory_status": "verified",
+      "local_registry_path": "docs/canonical/plan_registry_v1.json",
+      "notes": "Inventory reconciled against origin/master; Evidence Review & Assurance plan set mid-build. Local registry materialized from existing portfolio entries plus this documentation intake; inherited lifecycle/count fields are not requalified by this batch."
+    }
+  ],
+  "plans": [
+    {
+      "plan_id": "BDS-ERA-PLAN-SET-001",
+      "title": "ERA Plan Set (Evidence Review & Assurance)",
+      "version": "v1",
+      "owner_repository": "Boswell-Digital-Solutions/ERA",
+      "scope": "repository",
+      "lifecycle_status": "in_progress",
+      "plan_path": "docs/ERA_Plan_Set_MD",
+      "tracking_issue": null,
+      "implementation": {
+        "completed_slices": 10,
+        "total_slices": 14,
+        "evidence_status": "partial"
+      },
+      "next_action": "Build SH-02 post-patch gate, DF-01 DataForge-Local persistence, FC-01 ForgeCommand surface, AAR-01.",
+      "blocker": null,
+      "doc_system_paths": [],
+      "last_verified": null,
+      "archive": null,
+      "superseded_by": null,
+      "closeout_reason": null
+    },
+    {
+      "plan_id": "BDS-ERA-EVAL-v0.1",
+      "title": "ERA Quality-Gated Evaluation Expansion",
+      "version": "0.1",
+      "owner_repository": "Boswell-Digital-Solutions/ERA",
+      "scope": "repository",
+      "lifecycle_status": "in_progress",
+      "plan_path": "docs/plans/BDS_ERA_EVAL_v0.1/README.md",
+      "tracking_issue": null,
+      "implementation": {
+        "completed_slices": null,
+        "total_slices": 13,
+        "evidence_status": "partial"
+      },
+      "next_action": "Review the imported source package through the current amendment/evidence crosswalk, preserve GATE-06 and WP12 source evidence, and reconcile remaining package acceptance/consumer closeout without restarting implemented evaluation work.",
+      "blocker": "Source package reconciliation does not grant later work-package or operational authority; see the dated owning-repo reconciliation for exact remaining reviews.",
+      "doc_system_paths": [],
+      "last_verified": null,
+      "archive": null,
+      "superseded_by": null,
+      "closeout_reason": null
+    }
+  ]
+}

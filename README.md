@@ -216,3 +216,7 @@ DoppelCore intake receipt
 ```
 
 ForgeCommand returns the projection receipt, mapped incident, raw evidence digest, normalized digest, and DoppelCore intake receipt when an ERA projection is consumed.
+
+## Imported plan sources
+
+The [plan intake index](docs/plans/README.md) links the source-preserving Drive imports and their dated reconciliation against existing implementation evidence. Intake does not grant later execution or acceptance authority.

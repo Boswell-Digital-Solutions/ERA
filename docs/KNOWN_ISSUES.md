@@ -28,13 +28,21 @@ Findings for this repo. Each entry has a date, the problem, the root cause, the 
 
 ## 2026-09-30 — No downstream consumer for evaluation evidence
 
-**Status: OPEN (producer side closed 2026-09-30).**
+**Status: CLOSED 2026-10-17 for the consumer surfaces (producer side closed 2026-09-30). The signature limit below stays.**
 
 **Problem.** ERA writes `evaluation_export.json`. Nothing reads it. DataForge Local has no ERA or evaluation ingestion surface. Forge_Command shows ERA evidence only through the Centipede inbox, which takes findings and incidents, not evaluation claims.
 
 **Progress.** The contract is admitted in `forge_contract_core` (`era_evaluation_export` v1, RFC-ERA-EVAL-01, accepted 2026-09-30). ERA emits the admitted artifact and validates it against the contract's own vectors and validator.
 
-**Open.** DataForge Local drop-directory intake, and a separate Forge_Command read-only route. Each is its own bounded plan and PR. The envelope `signature` is an unsigned digest reference: ERA holds no signing key. A consumer must not read it as a signature.
+**Open (as of 2026-09-30, now stale).** DataForge Local drop-directory intake, and a separate Forge_Command read-only route. Each is its own bounded plan and PR. The envelope `signature` is an unsigned digest reference: ERA holds no signing key. A consumer must not read it as a signature.
+
+**Correction 2026-10-17.** The "Open" paragraph above is stale. Both consumer surfaces exist on the remote default branches. The BugCheck capability reconciliation (`BDS-ECOSYSTEM-BUGCHECK-CAPABILITY-RECON-v0.1`, capability C12; Forge_Command PR #638) found the Forge_Command route. This correction re-verified the full chain:
+
+- ERA publishes the export to the DataForge Local inbox (`era_integrations/inbox_publish.py:1-20`, ERA-PUB-01).
+- DataForge Local stores it from the drop directory (`proving_slice/services/era_drop_intake.py:1-23` on `dataforge-Local` `origin/master` at `e7ea1c1`, DFL-ERA-01). It serves two read-only routes (`app/api/era_evaluation_router.py:31`, mounted at `app/main.py:95`, DFL-ERA-02).
+- Forge_Command forwards those reads and has no write route (`src-tauri/src/api/routes/era_evaluation.rs:1-6`, registered at `src-tauri/src/fc_rest_server.rs:116-121`, on `origin/main` at `cc2391bf`, FC-ERA-01, PR #399).
+
+**Still open, outside this entry.** The signature limit above stays: a consumer must not read the digest reference as a signature. An ERA run carries its own `run_id`. It has no binding to a Forge_Command run or RunIntent. That binding is BugCheck design work that Forge_Command owns. It is not an ERA defect. No runtime test of the chain was run for this correction; the evidence is source reading only.
 
 
 ## 2026-09-30 — KI-ERA-20260930-001: Documentation builder ignores --check and rewrites the compiled reference

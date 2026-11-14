@@ -3,7 +3,7 @@ set -euo pipefail
 
 PARTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$PARTS_DIR/../.." && pwd)"
-ASSEMBLED_OUTPUT="${1:-$ROOT_DIR/doc/ERASYSTEM.md}"
+ASSEMBLED_OUTPUT="${1:-$ROOT_DIR/doc/eraSYSTEM.md}"
 
 require_contains() {
   local file="$1"; local needle="$2"; local label="$3"
@@ -14,15 +14,15 @@ require_absent() {
   if grep -Fq -- "$needle" "$file"; then echo "snapshot validation failed: $label still present in $file" >&2; echo "unexpected: $needle" >&2; exit 1; fi
 }
 
-require_contains "$PARTS_DIR/_index.md" "**Designation:** ERA" "index designation"
+require_contains "$PARTS_DIR/_index.md" "**Designation:** era" "index designation"
 require_contains "$PARTS_DIR/_index.md" "BDS Documentation Protocol v2.0" "index protocol"
-require_contains "$PARTS_DIR/_index.md" 'Primary output: `doc/ERASYSTEM.md`' "index primary output"
-require_contains "$PARTS_DIR/BUILD.sh" 'DESIGNATION="ERA"' "build designation"
+require_contains "$PARTS_DIR/_index.md" 'Primary output: `doc/eraSYSTEM.md`' "index primary output"
+require_contains "$PARTS_DIR/BUILD.sh" 'DESIGNATION="era"' "build designation"
 require_absent "$PARTS_DIR/_index.md" 'Primary output: `doc/SYSTEM.md`' "index legacy primary output"
 test -f "$ASSEMBLED_OUTPUT"
 require_contains "$ASSEMBLED_OUTPUT" "Document version" "assembled document version header"
-require_contains "$ASSEMBLED_OUTPUT" "**Designation:** ERA" "assembled designation"
-require_contains "$ASSEMBLED_OUTPUT" 'Primary output: `doc/ERASYSTEM.md`' "assembled primary output"
+require_contains "$ASSEMBLED_OUTPUT" "**Designation:** era" "assembled designation"
+require_contains "$ASSEMBLED_OUTPUT" 'Primary output: `doc/eraSYSTEM.md`' "assembled primary output"
 require_contains "$ASSEMBLED_OUTPUT" "BDS Documentation Protocol v2.0" "assembled protocol"
 require_contains "$ASSEMBLED_OUTPUT" "truth classes" "assembled truth classes"
 echo "snapshot validation passed: $ASSEMBLED_OUTPUT"
